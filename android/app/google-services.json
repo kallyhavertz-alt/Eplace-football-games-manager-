@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "910119612022",
+    "project_id": "eplace-1de05",
+    "storage_bucket": "eplace-1de05.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:910119612022:android:3580da965cee2858f83957",
+        "android_client_info": {
+          "package_name": "com.ePlace.eplace"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "910119612022-fbmequbvhurkk39gnmf48p2si07jc0k0.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ePlace.eplace",
+            "certificate_hash": "899d8efbb67b625a0db212e06a6353188627845d"
+          }
+        },
+        {
+          "client_id": "910119612022-kpmtlbvtnd1msto82beg0j7lmqcnqd1h.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7AyLCd21ASMyDJRI6G7XYzI9WkvX210Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "910119612022-kpmtlbvtnd1msto82beg0j7lmqcnqd1h.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "910119612022-pj5ce8btrtv20ieaboip02a5qfn915uk.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.ePlace.eplace"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
