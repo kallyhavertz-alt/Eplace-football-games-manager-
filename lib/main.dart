@@ -24,11 +24,9 @@ Future<void> main() async {
     debugPrint("Firebase initialization error: $e");
   }
 
-  // Initialize notifications in background - don't await to avoid blocking UI if offline
   NotificationService.initialize().catchError((e) => debugPrint("Notification init error: $e"));
 
-  // Check for session and subscribe in background
-  _handleStartupSubscription();
+   _handleStartupSubscription();
 
   runApp(const EPlaceApp());
 }
@@ -73,8 +71,7 @@ class EPlaceApp extends StatelessWidget {
               ),
             );
           }
-          // If a username exists, skip login
-          if (snapshot.hasData && snapshot.data != null) {
+           if (snapshot.hasData && snapshot.data != null) {
             return EplaceDashboardScreen(username: snapshot.data!);
           }
           return const AuthScreen();
@@ -139,7 +136,7 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
     try {
-      // Force sign out to allow fresh account selection
+
       await _googleSignIn.signOut();
 
       final googleUser = await _googleSignIn.authenticate();
@@ -167,12 +164,11 @@ class _AuthScreenState extends State<AuthScreen> {
         final String? email = data['email'] ?? googleUser.email;
         final String? jwtToken = data['token'] ?? data['jwtToken'];
 
-        // Safely parse userId regardless of whether backend returns int or String
         final dynamic rawId = data['userId'] ?? data['id'];
         final int? userId = (rawId is int) ? rawId : int.tryParse(rawId?.toString() ?? '');
 
-        debugPrint("🎉 Backend Response Data: $data");
-        debugPrint("🔍 Extracted userId: $userId | jwtToken present: ${jwtToken != null}");
+        debugPrint("Backend Response Data: $data");
+        debugPrint("Extracted userId: $userId | jwtToken present: ${jwtToken != null}");
 
         if (userId == null || jwtToken == null) {
           _showSnackbar('Invalid credentials returned from server.');
@@ -180,21 +176,19 @@ class _AuthScreenState extends State<AuthScreen> {
           return;
         }
 
-        // 1. AWAIT ALL SESSION SAVES BEFORE CONTINUING (Ensures 100% Session Readiness)
-        await Future.wait([
+         await Future.wait([
           SessionManager.saveUserId(userId),
           SessionManager.saveUsername(username),
           if (email != null) SessionManager.saveEmail(email),
           if (jwtToken.isNotEmpty) SessionManager.saveAuthToken(jwtToken),
         ]);
 
-        // 2. Subscribe to FCM Notifications
-        debugPrint("🚀 Calling subscribeToUserTopic for userId: $userId");
+
+        debugPrint("Calling subscribeToUserTopic for userId: $userId");
         await NotificationService.subscribeToUserTopic(userId);
 
         if (!mounted) return;
 
-        // 3. Complete navigation after session is fully persisted
         setState(() => _isLoading = false);
         _navigateToHome(username);
       } else {
@@ -203,7 +197,7 @@ class _AuthScreenState extends State<AuthScreen> {
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      debugPrint("🚨 Critical Error encountered during Google Sign-In pipeline: $e");
+      debugPrint("Critical Error encountered during Google Sign-In pipeline: $e");
       _showSnackbar('Google Sign-In integration error: $e');
       if (mounted) {
         setState(() => _isLoading = false);
@@ -241,19 +235,17 @@ class _AuthScreenState extends State<AuthScreen> {
 
           final String username = data['username'];
 
-          // Safely parse userId regardless of whether it's an int or a String
-          final dynamic rawId = data['userId'] ?? data['id'];
+           final dynamic rawId = data['userId'] ?? data['id'];
           final int? userId = (rawId is int) ? rawId : int.tryParse(rawId?.toString() ?? '');
 
-          print("🎉 Login Response Data: $data");
-          print("🔍 Extracted userId: $userId");
+          print("Login Response Data: $data");
+          print("Extracted userId: $userId");
 
-          // 1. Save session details
           await SessionManager.saveUsername(username);
 
           if (userId != null) {
             await SessionManager.saveUserId(userId);
-            print("🚀 Calling subscribeToUserTopic for userId: $userId");
+            print("Calling subscribeToUserTopic for userId: $userId");
             await NotificationService.subscribeToUserTopic(userId);
           } else {
             print("⚠️ userId is null, skipping FCM subscription.");
@@ -291,28 +283,25 @@ class _AuthScreenState extends State<AuthScreen> {
         if (response.statusCode == 201) {
           final Map<String, dynamic> data = jsonDecode(response.body);
 
-          // Safely parse userId regardless of whether it's an int or a String
           final dynamic rawId = data['id'];
           final int? userId = (rawId is int) ? rawId : int.tryParse(rawId?.toString() ?? '');
 
-          print("🎉 Register Response Data: $data");
-          print("🔍 Extracted userId: $userId");
+          print(" Register Response Data: $data");
+          print(" Extracted userId: $userId");
 
-          // 1. Save session details
+
           await SessionManager.saveUsername(username);
           if (userId != null) {
             await SessionManager.saveUserId(userId);
-            // 2. Subscribe to FCM topic for push notifications
-            print("🚀 Calling subscribeToUserTopic for userId: $userId");
+            print("Calling subscribeToUserTopic for userId: $userId");
             await NotificationService.subscribeToUserTopic(userId);
           } else {
-            print("⚠️ userId is null, skipping FCM subscription.");
+            print("userId is null, skipping FCM subscription.");
           }
 
           setState(() => _isLoading = false);
           _showSnackbar('Registration complete! Please verify your email.');
 
-          // Navigate to Verification Screen instead of home directly
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
@@ -753,17 +742,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     PesLoadingLogo(isLoading: _isLoading),
-/*
-                    const Center(
-                      child: Text(
-                        'e',
-                        style: TextStyle(
-                          fontSize: 48,
-                          fontWeight: FontWeight.w900,
-                          color: Colors.blueAccent,
-                        ),
-                      ),
-                    ),*/
+
                     const SizedBox(height: 12),
                     const Text(
                       'Verify your Email to participate\nin different leagues and tournaments',
@@ -775,7 +754,6 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                     const SizedBox(height: 32),
 
-                    // Email field + Send Code button inline or stacked
                     TextField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
@@ -810,7 +788,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
                     ),
                     const SizedBox(height: 24),
 
-                    // Verification code input
+
                     TextField(
                       controller: _codeController,
                       keyboardType: TextInputType.number,
@@ -876,7 +854,7 @@ class _EmailVerificationScreenState extends State<EmailVerificationScreen> {
   }
 }
 
-// --- DYNAMIC CUSTOM ANIMATED PES LOADING WIDGET LAYER ---
+
 class PesLoadingLogo extends StatefulWidget {
   final bool isLoading;
   const PesLoadingLogo({super.key, required this.isLoading});
@@ -1001,13 +979,12 @@ class _EFootballTransitionScreenState extends State<EFootballTransitionScreen>
   void initState() {
     super.initState();
 
-    // Total sequence duration (~5.5 seconds)
+
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 5500),
     );
 
-    // Phase 1: Spinner rotates approximately 3 times over the first 65% of the timeline
     _spinnerRotation = Tween<double>(begin: 0.0, end: 3 * 2 * math.pi).animate(
       CurvedAnimation(
         parent: _controller,
@@ -1015,8 +992,7 @@ class _EFootballTransitionScreenState extends State<EFootballTransitionScreen>
       ),
     );
 
-    // Phase 2: Logo scaling/pop-in and fade-in during the remaining duration
-    _brandScale = Tween<double>(begin: 0.7, end: 1.0).animate(
+   _brandScale = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.65, 1.0, curve: Curves.elasticOut),

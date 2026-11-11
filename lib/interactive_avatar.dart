@@ -98,9 +98,9 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
           ElevatedButton(
             onPressed: () {
               if (passwordController.text == _adminPassword) {
-                Navigator.pop(context); // Close password dialog
+                Navigator.pop(context);
 
-                // Navigate straight to the Admin Panel!
+
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AdminPanelScreen()),
@@ -145,7 +145,7 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
           );
         }
       },
-      offset: const Offset(0, 48), // Drops the menu down cleanly right below the avatar
+      offset: const Offset(0, 48),
       color: isDark ? Colors.grey.shade900 : Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(15),

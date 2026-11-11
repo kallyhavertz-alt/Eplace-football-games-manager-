@@ -18,7 +18,7 @@ class ProfileService {
     return '$baseHost${path.startsWith('/') ? '' : '/'}$path';
   }
 
-  // 1. Fetch User Profile
+
   static Future<Map<String, dynamic>?> fetchUserProfile(int userId) async {
     try {
       final response = await http
@@ -37,7 +37,6 @@ class ProfileService {
     return null;
   }
 
-  // 2. Fetch Friendship Overview (Friends list, Pending, Received)
   static Future<Map<String, dynamic>?> fetchFriendshipOverview(int userId) async {
     try {
       final response = await http
@@ -56,7 +55,6 @@ class ProfileService {
     return null;
   }
 
-  // 3. Search Users (Used in Pending tab search input)
   static Future<List<dynamic>> searchUsers(String query) async {
     try {
       final response = await http
@@ -71,7 +69,6 @@ class ProfileService {
         if (data is List) {
           return data;
         } else if (data is Map && data.containsKey('content')) {
-          // Handles Spring Data Pageable responses if applicable
           return data['content'] ?? [];
         }
       }
@@ -81,7 +78,7 @@ class ProfileService {
     return [];
   }
 
-  // 4. Send Friend Request
+
   static Future<bool> sendFriendRequest(int currentUserId, int targetUserId) async {
     try {
       final response = await http
@@ -98,7 +95,7 @@ class ProfileService {
     }
   }
 
-  // 5. Cancel Sent Friend Request
+
   static Future<bool> cancelFriendRequest(int currentUserId, int targetUserId) async {
     try {
       final response = await http
@@ -115,7 +112,7 @@ class ProfileService {
     }
   }
 
-  // 6. Respond to Friend Request (Accept / Decline)
+
   static Future<bool> respondToFriendRequest(int currentUserId, int friendshipId, bool accept) async {
     try {
       final response = await http
@@ -132,7 +129,7 @@ class ProfileService {
     }
   }
 
-  // 7. Fetch User Analytics
+
   static Future<Map<String, dynamic>?> fetchUserAnalytics(int userId) async {
     try {
       final response = await http

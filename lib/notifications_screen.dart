@@ -46,7 +46,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return;
       }
 
-      // 1. Load cached notifications first.
+
       final prefs = await SharedPreferences.getInstance();
 
       final cachedString =
@@ -74,7 +74,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       }
 
-      // 2. Fetch fresh notifications from backend.
+
       try {
         final List<dynamic> response =
         await NotificationService.fetchUserNotifications(userId);
@@ -86,21 +86,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
         if (!mounted) return;
 
-        // Replace cache with the latest server response.
+
         setState(() {
           _notifications = mapped;
           _sortNotifications();
           _isLoading = false;
         });
 
-        // Save fresh notifications locally.
+
         await _saveNotificationsLocally(userId, mapped);
       } catch (e) {
         debugPrint('Error fetching notifications: $e');
 
         if (mounted) {
           setState(() {
-            // Keep cached notifications if API fails.
+
             _isLoading = false;
           });
         }
@@ -140,7 +140,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     if (value is int) {
-      // Unix timestamp in milliseconds.
+
       return DateTime.fromMillisecondsSinceEpoch(value);
     }
 
@@ -189,12 +189,12 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     }
 
     try {
-      // Send request to backend.
+
       await NotificationService.markAsRead(notificationId);
 
       if (!mounted) return;
 
-      // Update local notification state.
+
       setState(() {
         for (var item in _notifications) {
           final int? itemId = int.tryParse(
@@ -208,7 +208,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         }
       });
 
-      // Save updated notifications.
+
       if (_userId != null) {
         await _saveNotificationsLocally(
           _userId!,
@@ -243,7 +243,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           item['timestamp'],
     );
 
-    // Mark as read when opening notification.
+
     _handleMarkAsRead(notificationId, isRead);
 
     showModalBottomSheet(
@@ -269,7 +269,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Drawer handle.
+
               Center(
                 child: Container(
                   width: 40,
@@ -283,7 +283,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
               const SizedBox(height: 16),
 
-              // Notification title.
+
               Row(
                 children: [
                   _buildNotificationAvatar(
@@ -308,7 +308,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
               const SizedBox(height: 8),
 
-              // Notification timestamp.
+
               Text(
                 timeStr,
                 style: TextStyle(
@@ -322,7 +322,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 height: 24,
               ),
 
-              // Full notification message.
+
               ConstrainedBox(
                 constraints: const BoxConstraints(
                   maxHeight: 300,
@@ -341,7 +341,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
               const SizedBox(height: 20),
 
-              // Close button.
+
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
@@ -388,7 +388,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         .toString()
         .toLowerCase();
 
-    // Profile picture.
+
     final String? profilePicUrl = (
         item['profilePictureUrl'] ??
             item['profile_pic'] ??
@@ -396,7 +396,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             item['avatar']
     )?.toString();
 
-    // Friendship or user-related notifications.
+
     final bool isUserOrFriend =
         type.contains('social') ||
             type.contains('friend_request') ||
@@ -422,7 +422,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
-    // League or tournament notifications.
+
     final bool isLeague =
         type.contains('league') ||
             title.contains('league') ||
@@ -463,7 +463,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       );
     }
 
-    // Default fallback icon.
+
     final bool isApproved =
         title.contains('approved') ||
             title.contains('verified');
@@ -485,9 +485,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-  // ============================================================
-  // FORMAT TIMESTAMP
-  // ============================================================
 
   String _formatTimestamp(dynamic rawTimestamp) {
     if (rawTimestamp == null) {
@@ -520,15 +517,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return n.toString().padLeft(2, '0');
   }
 
-  // ============================================================
-  // BUILD SCREEN
-  // ============================================================
+
 
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        // Background image.
+
         Positioned.fill(
           child: Image.asset(
             'assets/screens.png',
@@ -541,7 +536,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ),
 
-        // Transparent scaffold.
+
         Scaffold(
           backgroundColor: Colors.transparent,
 
@@ -624,7 +619,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 final bool isLong =
                     message.length > 60;
 
-                // Preview message.
+
                 final String displayMessage =
                 isLong
                     ? '${message.substring(0, 60)}...'
@@ -663,7 +658,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       CrossAxisAlignment.start,
 
                       children: [
-                        // Notification header.
+
                         Row(
                           children: [
                             _buildNotificationAvatar(
@@ -698,7 +693,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
                         const SizedBox(height: 8),
 
-                        // Notification preview.
+
                         Text(
                           displayMessage,
                           style: TextStyle(
@@ -709,7 +704,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
                         const SizedBox(height: 4),
 
-                        // Read button.
+
                         Row(
                           mainAxisAlignment:
                           MainAxisAlignment.end,

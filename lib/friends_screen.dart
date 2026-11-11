@@ -566,8 +566,11 @@ class _FriendsScreenState extends State<FriendsScreen>
               },
             ),
           ),
-        ] else if (_pendingList.isNotEmpty) ...[
-          Expanded(
+
+
+        ] else if (_pendingList.isNotEmpty)
+          ...[
+            Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               itemCount: _pendingList.length,

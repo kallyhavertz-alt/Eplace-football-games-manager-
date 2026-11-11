@@ -1,12 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// eFootball-style loader, matched to the reference video:
-/// light-grey rounded tile, two thick flat-ended arcs that spin and settle
-/// with their gaps on the left/right, then two parallel bars slide in from
-/// the left ("=" mark), hold, and the whole mark spins again (loops).
 class EFootballLoader extends StatefulWidget {
-  final VoidCallback? onComplete; // fired after the first full cycle
+  final VoidCallback? onComplete;
   final double size;
   final bool loop;
 
@@ -37,22 +33,19 @@ class _EFootballLoaderState extends State<EFootballLoader>
       duration: const Duration(milliseconds: 2200),
     );
 
-    // Spin 1.5 turns: fast start, eases into rest with gaps left/right.
-    _rotation = Tween<double>(begin: 0, end: math.pi * 3).animate(
+     _rotation = Tween<double>(begin: 0, end: math.pi * 3).animate(
       CurvedAnimation(
         parent: _controller,
         curve: const Interval(0.0, 0.55, curve: Curves.easeInOutCubic),
       ),
     );
 
-    // Bars slide in from the left once the ring has settled.
     _barsIn = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.5, 0.72, curve: Curves.easeOutCubic),
     );
 
-    // Bars vanish quickly as the next spin begins.
-    _barsOut = CurvedAnimation(
+     _barsOut = CurvedAnimation(
       parent: _controller,
       curve: const Interval(0.0, 0.08, curve: Curves.easeIn),
     );
@@ -88,8 +81,7 @@ class _EFootballLoaderState extends State<EFootballLoader>
       child: AnimatedBuilder(
         animation: _controller,
         builder: (context, _) {
-          // First cycle starts without bars; later cycles start with them visible.
-          final barsVisible = _completedOnce ? 1 - _barsOut.value : 0.0;
+           final barsVisible = _completedOnce ? 1 - _barsOut.value : 0.0;
           final inProgress = _controller.value >= 0.5 ? _barsIn.value : 0.0;
           return CustomPaint(
             size: Size(s, s),
@@ -107,8 +99,8 @@ class _EFootballLoaderState extends State<EFootballLoader>
 
 class _EFootballLogoPainter extends CustomPainter {
   final double rotation;
-  final double barsIn; // 0..1 slide-in progress
-  final double barsLeftover; // 0..1 opacity of bars from previous cycle
+  final double barsIn;
+  final double barsLeftover;
 
   _EFootballLogoPainter({
     required this.rotation,
@@ -126,9 +118,9 @@ class _EFootballLogoPainter extends CustomPainter {
       ..color = Colors.black
       ..style = PaintingStyle.stroke
       ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.butt; // flat ends like the video
+      ..strokeCap = StrokeCap.butt;
 
-    const gap = math.pi * 0.24; // gap at left and right
+    const gap = math.pi * 0.24;
     const sweep = math.pi - gap;
 
     canvas.save();
@@ -136,19 +128,18 @@ class _EFootballLogoPainter extends CustomPainter {
     canvas.rotate(rotation);
 
     final rect = Rect.fromCircle(center: Offset.zero, radius: r);
-    // Top arc (gaps centred on 180° and 0°)
-    canvas.drawArc(rect, math.pi + gap / 2, sweep, false, arcPaint);
-    // Bottom arc
+     canvas.drawArc(rect, math.pi + gap / 2, sweep, false, arcPaint);
+
     canvas.drawArc(rect, gap / 2, sweep, false, arcPaint);
 
-    // Leftover bars rotate with the ring and fade out
+
     if (barsLeftover > 0) {
       _drawBars(canvas, r, stroke, 1.0, barsLeftover);
     }
+
     canvas.restore();
 
-    // New bars slide in from the left at rest orientation
-    if (barsIn > 0) {
+     if (barsIn > 0) {
       canvas.save();
       canvas.translate(c.dx, c.dy);
       _drawBars(canvas, r, stroke, barsIn, 1.0);
@@ -160,9 +151,8 @@ class _EFootballLogoPainter extends CustomPainter {
       Canvas canvas, double r, double stroke, double progress, double opacity) {
     final paint = Paint()..color = Colors.black.withOpacity(opacity);
     final barH = stroke * 0.55;
-    final spacing = stroke * 0.45; // space between the two bars
+    final spacing = stroke * 0.45;
     final halfLen = r * 1.05;
-    // Slide from the left: offset shrinks to 0 as progress -> 1
     final dx = -r * 0.9 * (1 - progress);
 
     final topRect =
@@ -170,7 +160,6 @@ class _EFootballLogoPainter extends CustomPainter {
     final botRect =
     Rect.fromLTWH(-halfLen + dx, spacing / 2, halfLen * 2, barH);
 
-    // Clip so the bars look embedded in the ring
     canvas.save();
     canvas.clipRect(Rect.fromLTRB(-r - stroke / 2, -r, r + stroke / 2, r));
     canvas.drawRect(topRect, paint);

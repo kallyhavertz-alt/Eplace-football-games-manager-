@@ -19,10 +19,8 @@ class _EFootballStyleTransitionScreenState
     with TickerProviderStateMixin {
   late AnimationController _mainController;
 
-  // Phase 1: Spinner animations
   late Animation<double> _spinAnimation;
 
-  // Phase 2: Logo Reveal animations
   late Animation<double> _logoScaleAnimation;
   late Animation<double> _logoFadeAnimation;
 
@@ -32,13 +30,11 @@ class _EFootballStyleTransitionScreenState
   void initState() {
     super.initState();
 
-    // Total duration for the transition sequence (~3 seconds)
     _mainController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     );
 
-    // 1. Spinner rotates about 3 times during the first 60% of the timeline
     _spinAnimation = Tween<double>(begin: 0.0, end: 3 * 2 * math.pi).animate(
       CurvedAnimation(
         parent: _mainController,
@@ -46,8 +42,7 @@ class _EFootballStyleTransitionScreenState
       ),
     );
 
-    // 2. Logo scaling/pop-in during the remaining portion (60% to 100%)
-    _logoScaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+     _logoScaleAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
       CurvedAnimation(
         parent: _mainController,
         curve: const Interval(0.6, 1.0, curve: Curves.elasticOut),
@@ -61,7 +56,7 @@ class _EFootballStyleTransitionScreenState
       ),
     );
 
-    // Switch phases based on controller progress
+
     _mainController.addListener(() {
       if (_mainController.value >= 0.6 && !_isLogoPhase) {
         setState(() {
@@ -70,7 +65,7 @@ class _EFootballStyleTransitionScreenState
       }
     });
 
-    // Trigger completion callback when sequence ends
+
     _mainController.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
         widget.onAnimationFinished();
@@ -94,7 +89,6 @@ class _EFootballStyleTransitionScreenState
         child: !_isLogoPhase
             ? Container(
           key: const ValueKey('LoaderPhase'),
-          // Customized yellow background instead of white/black to avoid copyright
           color: const Color(0xFFFFD700),
           child: Center(
             child: AnimatedBuilder(
@@ -128,7 +122,6 @@ class _EFootballStyleTransitionScreenState
         )
             : Container(
           key: const ValueKey('LogoPhase'),
-          // Deep blue sporting branding background matching video style
           color: const Color(0xFF00113B),
           child: Center(
             child: FadeTransition(
@@ -138,7 +131,6 @@ class _EFootballStyleTransitionScreenState
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Custom emblem / Icon matching your League Manager style
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(

@@ -14,7 +14,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   bool _isLoading = false;
-  int _currentStep = 1; // 1: Enter Email, 2: Enter Token & New Password
+  int _currentStep = 1;
 
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _tokenController = TextEditingController();
@@ -28,7 +28,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  // --- STEP 1: Dispatch Recovery Token ---
+
   Future<void> _dispatchForgotPasswordCode() async {
     final String email = _emailController.text.trim();
     if (email.isEmpty) {
@@ -47,7 +47,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       if (response.statusCode == 200) {
         _showSnackbar('Verification code dispatched to your inbox!');
         setState(() {
-          _currentStep = 2; // Transition smoothly to validation fields
+          _currentStep = 2;
         });
       } else {
         _showSnackbar('Could not initialize account recovery.');
@@ -59,8 +59,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     }
   }
 
-  // --- STEP 2: Execute Password Reset ---
-  Future<void> _executePasswordReset() async {
+   Future<void> _executePasswordReset() async {
     final String token = _tokenController.text.trim();
     final String newPassword = _newPasswordController.text.trim();
 
@@ -82,7 +81,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
       if (response.statusCode == 200) {
         _showSnackbar('Password updated successfully! Redirecting to login...');
-        Navigator.pop(context); // Take them clean back to AuthScreen login
+        Navigator.pop(context);
       } else {
         _showSnackbar('Invalid or expired 6-digit validation token.');
       }
@@ -113,7 +112,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       extendBodyBehindAppBar: true,
       body: Stack(
         children: [
-          // Match your design asset background layout
+
           Positioned.fill(
             child: Image.asset(
               'assets/eplace_background.png',

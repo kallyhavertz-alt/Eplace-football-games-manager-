@@ -366,7 +366,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildFriendsSection(List friends) {
-    // Restrict to max 5 friends for horizontal preview
+
     final displayedFriends = friends.take(5).toList();
 
     return Column(
@@ -478,7 +478,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 }
 
-/// Dedicated Screen to display all friends of the target user vertically
+
 class TargetUserAllFriendsScreen extends StatelessWidget {
   final String targetUsername;
   final List<dynamic> allFriends;
@@ -530,7 +530,6 @@ class TargetUserAllFriendsScreen extends StatelessWidget {
           final bool isOnline = friend['isOnline'] ?? friend['online'] ?? false;
           final String resolvedAvatar = _resolveAvatarUrl(friend['profilePictureUrl'] ?? friend['avatarUrl']);
 
-          // Check if current user is already friends with this person
           final bool isAlreadyFriend = friendId == currentUserId ||
               currentUserFriends.any((f) => (f['userId'] ?? f['id']) == friendId);
 

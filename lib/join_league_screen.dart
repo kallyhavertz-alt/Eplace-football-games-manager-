@@ -47,7 +47,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
     super.dispose();
   }
 
-  // --- FETCH ALL LEAGUES FROM SPRING BOOT ---
+
   Future<void> _fetchLeagues() async {
     setState(() {
       _isLoading = true;
@@ -82,7 +82,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
     }
   }
 
-  // --- LOCAL FILTERING LOGIC (NAME + AMOUNT) ---
+
   void _applyFilters() {
     final query = _searchController.text.trim().toLowerCase();
 
@@ -103,7 +103,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
     });
   }
 
-  // --- CHECK USER PROFILE BEFORE JOINING ---
+
   Future<void> _checkAndProceedJoin(Map<String, dynamic> league) async {
     final int userId = _currentUserId ?? await SessionManager.getUserId() ?? 0;
     if (userId == 0) {
@@ -140,7 +140,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
             builder: (context) => ProfileCompletionSheet(userId: userId),
           );
 
-          if (completed != true) return; // User canceled or didn't finish
+          if (completed != true) return;
         }
       }
     } catch (e) {
@@ -254,7 +254,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
 
                     const SizedBox(height: 20),
 
-                    // ================= SUBMIT BUTTON =================
+
                     SizedBox(
                       width: double.infinity,
                       height: 48,

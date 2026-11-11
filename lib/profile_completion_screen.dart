@@ -68,7 +68,7 @@ class _ProfileCompletionSheetState extends State<ProfileCompletionSheet> {
       if (mounted) {
         setState(() => _isSaving = false);
         if (response.statusCode == 200) {
-          Navigator.pop(context, true); // Returns true to resume action
+          Navigator.pop(context, true);
         } else {
           final err = jsonDecode(response.body);
           setState(() => _errorMessage = err['message'] ?? "Failed to update details.");

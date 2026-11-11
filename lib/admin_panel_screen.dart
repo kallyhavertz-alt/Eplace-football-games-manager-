@@ -26,8 +26,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     _fetchAdminDashboardData();
   }
 
-  // --- FETCH DATA FROM SPRING BOOT ---
-  Future<void> _fetchAdminDashboardData() async {
+   Future<void> _fetchAdminDashboardData() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -94,11 +93,9 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     }
   }
 
-  // --- REJECT REQUEST ACTION ---
   Future<void> _rejectRequest(String id, String message) async {
     try {
-      // Extract numeric ID from "req_123" -> 123
-      final String numericId = id.replaceAll('req_', '');
+       final String numericId = id.replaceAll('req_', '');
 
       final response = await http.post(
         Uri.parse('$_baseUrl/admin/$numericId/reject'),
@@ -231,7 +228,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16.0),
           children: [
-            // ==================== PENDING CREATIONS & JOINS ====================
+
             if (_pendingRequests.isNotEmpty) ...[
               Text(
                 'Pending Approvals',
@@ -287,7 +284,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.end,
                       children: [
-                        // Reject Button
+
                         OutlinedButton(
                           onPressed: () => _rejectRequest(req['id'], requestDetails),
                           style: OutlinedButton.styleFrom(
@@ -299,7 +296,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
                           child: const Text('Reject', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                         ),
                         const SizedBox(width: 8),
-                        // Accept Button
+
                         ElevatedButton(
                           onPressed: () => _acceptRequest(req['id'], requestDetails),
                           style: ElevatedButton.styleFrom(
@@ -318,7 +315,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
               );
             }),
 
-            // ==================== LEAGUE ENDED / PAYOUTS SECTION ====================
             if (_pendingPayouts.isNotEmpty) ...[
               const SizedBox(height: 12),
               Text(
@@ -429,7 +425,6 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             const Divider(color: Colors.white24),
             const SizedBox(height: 10),
 
-            // ==================== ACCEPTED AND CONFIRMED HISTORY SECTION ====================
             Padding(
               padding: const EdgeInsets.only(bottom: 12.0),
               child: Text(

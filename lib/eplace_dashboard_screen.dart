@@ -35,7 +35,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- HEADER LAYER ---
+
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -95,9 +95,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
               ),
               const SizedBox(height: 24),
 
-              // --- FEATURED SECTIONS (SWAPPING CARDS / EFOOTBALL STYLE) ---
 
-              // 1. UCL Championship Section
               _buildFeaturedSection(
                 title: 'UCL Championship',
                 cards: [
@@ -121,7 +119,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
               ),
               const SizedBox(height: 20),
 
-              // 2. Top Leagues Section
+
               _buildFeaturedSection(
                 title: 'Top Leagues',
                 cards: [
@@ -145,7 +143,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
               ),
               const SizedBox(height: 20),
 
-              // 3. Top Tournaments Section
+
               _buildFeaturedSection(
                 title: 'Top Tournaments',
                 cards: [
@@ -169,7 +167,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
               ),
 
               const SizedBox(height: 16),
-              // --- JOIN A LEAGUE NOW ---
+
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton.icon(
@@ -188,7 +186,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
               ),
               const SizedBox(height: 20),
 
-              // --- MY LEAGUES HISTORY LIST ---
+
               Row(
                 children: [
                   Icon(Icons.sort, color: Colors.grey[400], size: 20),
@@ -200,7 +198,7 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              //_buildHistoryList(),
+
             ],
           ),
         ),
@@ -232,7 +230,6 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
     );
   }
 
-  // Helper widget to render category titles with swappable card carousels
   Widget _buildFeaturedSection({required String title, required List<Widget> cards}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -254,15 +251,15 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
     );
   }
 
-  // Individual eFootball style card with background image & overlay
-  Widget _buildEFootballCard({
+   Widget _buildEFootballCard({
     required String leagueName,
     required String tagline,
     required String winnerPrize,
     required String joinFee,
     required String slots,
     required String imageUrl,
-  }) {
+  })
+   {
     return Container(
       margin: const EdgeInsets.only(right: 12),
       decoration: BoxDecoration(

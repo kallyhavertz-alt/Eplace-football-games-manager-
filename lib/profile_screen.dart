@@ -71,7 +71,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _isOffline = false;
           });
 
-          // Cache details locally for offline use
           if (profileData != null) {
             final String? customAvatarPath = prefs.getString('user_avatar_path_$userId');
             if (customAvatarPath != null) {
@@ -97,7 +96,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
 
-    // Fallback to local cache when offline or network error
     final cachedProfileStr = prefs.getString('cached_user_profile_$userId');
     final cachedOverviewStr = prefs.getString('cached_friendship_overview_$userId');
     final customAvatarPath = prefs.getString('user_avatar_path_$userId');
@@ -185,32 +183,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
 
-                // 1. TOP HEADER
+
                 _buildTopHeader(),
                 const SizedBox(height: 20),
 
-                // 2. USER DETAILS + AVATAR & STRENGTH
+
                 _buildUserInfoSection(),
                 const SizedBox(height: 24),
 
                 const Divider(color: Colors.white24, height: 1),
                 const SizedBox(height: 20),
 
-                // 3. ACHIEVEMENTS SECTION
+
                 _buildAchievementsSection(),
                 const SizedBox(height: 24),
 
                 const Divider(color: Colors.white24, height: 1),
                 const SizedBox(height: 20),
 
-                // 4. FRIENDS SECTION
+
                 _buildFriendsSection(friends),
                 const SizedBox(height: 24),
 
                 const Divider(color: Colors.white24, height: 1),
                 const SizedBox(height: 20),
 
-                // 5. FRIEND SUGGESTIONS SECTION
+
                 _buildSuggestionsSection(suggestions),
                 const SizedBox(height: 16),
               ],

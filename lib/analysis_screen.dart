@@ -38,8 +38,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     }
   }
 
-  /// Helper to pick bar colors based on performance percentages
-  Color _getBarColor(int percentage) {
+   Color _getBarColor(int percentage) {
     if (percentage >= 80) return Colors.greenAccent;
     if (percentage >= 60) return Colors.blueAccent;
     if (percentage >= 40) return Colors.amberAccent;
@@ -57,7 +56,6 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
       );
     }
 
-    // Dynamic Calculations with Fallbacks
     final int createdCount = _analyticsData?['createdLeagues'] ?? 0;
     final int maxCreated = _analyticsData?['maxCreatedLeagues'] ?? 50;
     final int playedCount = _analyticsData?['leaguesPlayed'] ?? 0;
@@ -112,7 +110,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 const Divider(color: Colors.white24),
                 const SizedBox(height: 20),
 
-                // 2. PROGRESS SECTION
+
                 const Text(
                   'Progress',
                   style: TextStyle(
@@ -128,7 +126,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // 3. BAR CHART DISPLAY
+
                 SizedBox(
                   height: 180,
                   child: Row(
@@ -149,7 +147,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                               fontWeight: FontWeight.bold,
                             ),
                           ),
+
                           const SizedBox(height: 6),
+
                           AnimatedContainer(
                             duration: const Duration(milliseconds: 500),
                             width: 32,
@@ -171,8 +171,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
                 const Divider(color: Colors.white24),
                 const SizedBox(height: 20),
 
-                // 4. WIN / LOSS PROBABILITIES
-                _buildMetricRow(
+                 _buildMetricRow(
                   'Possibility to win',
                   '${winRate.toStringAsFixed(0)}%',
                   valueColor: Colors.greenAccent,
@@ -186,8 +185,7 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
 
                 const SizedBox(height: 80),
 
-                // 5. FOOTER LOGO BRANDING
-                Center(
+                 Center(
                   child: Column(
                     children: [
                       Image.asset(

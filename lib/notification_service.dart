@@ -70,13 +70,12 @@ class NotificationService {
       debugPrint("Failed to create notification channel: $e");
     }
 
-    // Handle background notification clicks (when app is in background but not terminated)
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
       debugPrint('FCM Notification clicked from background');
       _navigateToNotifications();
     });
 
-    // Handle initial message if app was terminated
+
     _firebaseMessaging.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
         debugPrint('FCM Notification clicked from terminated state');
@@ -84,7 +83,7 @@ class NotificationService {
       }
     });
 
-    // Foreground Push Notification Listener
+
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       RemoteNotification? notification = message.notification;
       AndroidNotification? android = message.notification?.android;
@@ -108,7 +107,6 @@ class NotificationService {
       }
     });
 
-    // Don't let getToken block initialization if network is unstable
     _firebaseMessaging.getToken().then((token) {
       debugPrint("ePlace FCM Device Token: $token");
     }).catchError((e) {
@@ -126,20 +124,20 @@ class NotificationService {
     final String topic = 'user_$userId';
     try {
       await _firebaseMessaging.subscribeToTopic(topic);
-      print("✅ Successfully subscribed to FCM topic: $topic");
+      print("======= Successfully subscribed to FCM topic: $topic");
     } catch (e) {
-      print("❌ Error subscribing to topic $topic: $e");
+      print(" ======Error subscribing to topic $topic: $e");
     }
   }
 
-  /// Call this when the user logs out
+
   static Future<void> unsubscribeFromUserTopic(int userId) async {
     final String topic = 'user_$userId';
     try {
       await _firebaseMessaging.unsubscribeFromTopic(topic);
-      print("ℹ️ Unsubscribed from FCM topic: $topic");
+      print("====Unsubscribed from FCM topic: $topic");
     } catch (e) {
-      print("❌ Error unsubscribing from topic $topic: $e");
+      print("====== Error unsubscribing from topic $topic: $e");
     }
   }
 

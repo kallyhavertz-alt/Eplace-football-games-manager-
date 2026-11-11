@@ -69,7 +69,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
     } catch (e) {
-      debugPrint("🚨 Error loading user profile in Edit Screen: $e");
+      debugPrint("Error loading user profile in Edit Screen: $e");
     }
   }
 
@@ -143,16 +143,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         if (!context.mounted) return;
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('👋 Your account has been permanently removed.')),
+                          const SnackBar(content: Text('Your account has been permanently removed.')),
                         );
-                        // Route back to login or clear session
+
                       } else {
                         throw Exception('Server rejected data deletion.');
                       }
                     } catch (e) {
                       setModalState(() => isPurging = false);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('🚨 Deletion failed. Check network connection.')),
+                        const SnackBar(content: Text('Deletion failed. Check network connection.')),
                       );
                     }
                   },
@@ -298,7 +298,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         });
 
                         try {
-                          // Uses multipart form request update to handle password change securely alongside profile specs
                           var request = http.MultipartRequest('PUT', Uri.parse('${widget.baseUrl}/profile/${widget.userId}'));
                           request.fields['currentPassword'] = currentPwd;
                           request.fields['newPassword'] = newPwd;
@@ -322,7 +321,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         } catch (e) {
                           setModalState(() {
                             isUpdatingPassword = false;
-                            errorMessage = '🚨 Connection error.';
+                            errorMessage = 'Connection error.';
                           });
                         }
                       },
@@ -520,7 +519,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Base server URL prefix check for profile pictures
+
     String fullAvatarUrl = '';
     if (_serverAvatarPath != null && _serverAvatarPath!.isNotEmpty) {
       if (_serverAvatarPath!.startsWith('http')) {

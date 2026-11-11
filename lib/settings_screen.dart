@@ -37,7 +37,7 @@ class SettingsScreen extends StatelessWidget {
                 ),
               ),
               onPressed: () {
-                Navigator.of(dialogContext).pop(); // Close dialog
+                Navigator.of(dialogContext).pop();
                 _triggerLogoutSequence(context);
               },
               child: const Text('Logout', style: TextStyle(color: Colors.white)),
@@ -57,7 +57,7 @@ class SettingsScreen extends StatelessWidget {
         return Center(
           child: EFootballLoader(
             onComplete: () async {
-              Navigator.of(dialogContext).pop(); // Close loader dialog
+              Navigator.of(dialogContext).pop();
               await SessionManager.clearSession();
               if (!context.mounted) return;
               Navigator.of(context).pushAndRemoveUntil(
@@ -83,7 +83,7 @@ class SettingsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 12.0),
         children: [
-          // 1. Theme
+          // Theme
           const ListTile(
             leading: Icon(Icons.palette_outlined, color: Colors.white70),
             title: Text('Theme', style: TextStyle(color: Colors.white)),
@@ -93,7 +93,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Colors.white12),
 
-          // 2. Available updates
+
           const ListTile(
             leading: Icon(Icons.system_update_outlined, color: Colors.white70),
             title: Text('Available updates', style: TextStyle(color: Colors.white)),
@@ -103,7 +103,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Colors.white12),
 
-          // 3. Edit profile
+
           ListTile(
             leading: const Icon(Icons.person_outline, color: Colors.white70),
             title: const Text('Edit profile', style: TextStyle(color: Colors.white)),
@@ -129,7 +129,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Colors.white12),
 
-          // 4. Clear local cache
+
           const ListTile(
             leading: Icon(Icons.cleaning_services_outlined, color: Colors.white70),
             title: Text('Clear local cache', style: TextStyle(color: Colors.white)),
@@ -139,7 +139,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Colors.white12),
 
-          // 5. Rate us
+
           const ListTile(
             leading: Icon(Icons.star_outline, color: Colors.white70),
             title: Text('Rate us', style: TextStyle(color: Colors.white)),
@@ -148,7 +148,7 @@ class SettingsScreen extends StatelessWidget {
           ),
           const Divider(height: 1, color: Colors.white12),
 
-          // 6. About us
+
           const ListTile(
             leading: Icon(Icons.info_outline, color: Colors.white70),
             title: Text('About us', style: TextStyle(color: Colors.white)),
@@ -159,7 +159,7 @@ class SettingsScreen extends StatelessWidget {
 
           const SizedBox(height: 24),
 
-          // 7. Logout (Functional Option)
+
           ListTile(
             leading: const Icon(Icons.logout, color: Colors.redAccent),
             title: const Text(
