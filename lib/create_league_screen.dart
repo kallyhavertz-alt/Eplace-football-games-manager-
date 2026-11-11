@@ -1,12 +1,13 @@
 import 'dart:convert';
-import 'dart:math' as math;
+import 'package:eplace/profile_completion_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:eplace/session_manager.dart';
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 
 class CreateLeagueScreen extends StatefulWidget {
-  final int userId;
-
-  const CreateLeagueScreen({super.key, this.userId = 1});
+  const CreateLeagueScreen({super.key});
 
   @override
   State<CreateLeagueScreen> createState() => _CreateLeagueScreenState();
@@ -18,7 +19,7 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _maxTeamsController = TextEditingController();
 
-  static const String _backendApiUrl = 'http://192.168.1.167:8080/api/v1/leagues/create-request';
+  static const String _backendApiUrl = 'http://172.16.123.181:8081/api/v1/leagues/create-request';
 
   final List<int> _allowedAmounts = [20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 500, 600, 1000];
   int _selectedAmount = 50;
@@ -27,6 +28,22 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
   final List<String> _awardOptions = ['1st only', '1st and 2nd', '1st, 2nd and 3rd'];
 
   bool _isProcessing = false;
+  int? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserId();
+  }
+
+  Future<void> _loadUserId() async {
+    final id = await SessionManager.getUserId();
+    if (mounted) {
+      setState(() {
+        _userId = id;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -35,7 +52,6 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
     super.dispose();
   }
 
-  // Helper method to convert UI display string to Spring Boot AwardType Enum
   String _mapAwardTypeToEnum(String uiValue) {
     switch (uiValue) {
       case '1st only':
@@ -47,6 +63,48 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
       default:
         return 'FIRST_ONLY';
     }
+  }
+
+  Future<void> _checkAndProceedCreation() async {
+    final int userId = _userId ?? await SessionManager.getUserId() ?? 0;
+    if (userId == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User session not found. Please log in again.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('http://172.16.123.181:8081/api/users/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        final String? phone = userData['phoneNumber'];
+        final String? dob = userData['dateOfBirth'];
+
+        if (phone == null || phone.isEmpty || dob == null || dob.toString().isEmpty) {
+          if (!mounted) return;
+          final bool? completed = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => ProfileCompletionSheet(userId: userId),
+          );
+
+          if (completed != true) return;
+        }
+      }
+    } catch (e) {
+      debugPrint("Profile validation check error: $e");
+    }
+
+    if (!mounted) return;
+    _showPaymentInstructionsDialog(_selectedAmount);
   }
 
   void _showPaymentInstructionsDialog(int amount) {
@@ -141,14 +199,16 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
   }
 
   Future<void> _submitLeagueToAdminPipeline(String accountCode) async {
+    final int userId = _userId ?? await SessionManager.getUserId() ?? 1;
+
     setState(() => _isProcessing = true);
 
     final Map<String, dynamic> leagueData = {
-      'creatorId': widget.userId,
+      'creatorId': userId,
       'name': _nameController.text.trim(),
       'joinAmount': _selectedAmount,
       'maxTeams': int.parse(_maxTeamsController.text.trim()),
-      'awardType': _mapAwardTypeToEnum(_selectedAwardDistribution), // Fixed enum mapping
+      'awardType': _mapAwardTypeToEnum(_selectedAwardDistribution),
       'accountCode': accountCode,
     };
 
@@ -157,7 +217,7 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
         Uri.parse(_backendApiUrl),
         headers: {
           'Content-Type': 'application/json',
-          'X-User-Id': widget.userId.toString(),
+          'X-User-Id': userId.toString(),
         },
         body: jsonEncode(leagueData),
       );
@@ -193,17 +253,16 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
 
   void _validateAndSubmitForm() {
     if (_formKey.currentState!.validate()) {
-      _showPaymentInstructionsDialog(_selectedAmount);
+      _checkAndProceedCreation();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
+    return EPlaceScaffold(
       appBar: AppBar(
-        title: const Text('CREATE LEAGUE', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2)),
-        backgroundColor: Colors.transparent,
+        title: const Text('CREATE LEAGUE', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1.2, color: Colors.white)),
+        backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
@@ -339,7 +398,7 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const EplaceStrikingLoader(size: 80),
+                        const EFootballLoader(size: 80),
                         const SizedBox(height: 24),
                         Text(
                           'Submitting to Admin Desk...',
@@ -394,106 +453,4 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
       ),
     );
   }
-}
-
-// --- CUSTOM ROTATING E-LOADER WIDGET ---
-class EplaceStrikingLoader extends StatefulWidget {
-  final double size;
-  const EplaceStrikingLoader({super.key, this.size = 70.0});
-
-  @override
-  State<EplaceStrikingLoader> createState() => _EplaceStrikingLoaderState();
-}
-
-class _EplaceStrikingLoaderState extends State<EplaceStrikingLoader> with SingleTickerProviderStateMixin {
-  late AnimationController _rotationController;
-
-  @override
-  void initState() {
-    super.initState();
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
-  }
-
-  @override
-  void dispose() {
-    _rotationController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _rotationController,
-      builder: (context, child) {
-        return CustomPaint(
-          size: Size(widget.size, widget.size),
-          painter: _EplaceLoaderPainter(
-            rotation: _rotationController.value,
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _EplaceLoaderPainter extends CustomPainter {
-  final double rotation;
-  _EplaceLoaderPainter({required this.rotation});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final double radius = size.width / 2;
-    final Offset center = Offset(radius, radius);
-
-    // 1. Top Arc
-    final Paint topArcPaint = Paint()
-      ..color = Colors.blueAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.0
-      ..strokeCap = StrokeCap.round;
-
-    final double topStartAngle = (rotation * 2 * math.pi) - (math.pi / 2);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - 8),
-      topStartAngle,
-      math.pi * 0.9,
-      false,
-      topArcPaint,
-    );
-
-    // 2. Bottom Arc
-    final Paint bottomArcPaint = Paint()
-      ..color = Colors.blueAccent.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 6.0
-      ..strokeCap = StrokeCap.round;
-
-    final double bottomStartAngle = -(rotation * 2 * math.pi) + (math.pi / 2);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - 8),
-      bottomStartAngle,
-      math.pi * 0.9,
-      false,
-      bottomArcPaint,
-    );
-
-    // 3. Central Striking Dash
-    final Paint dashPaint = Paint()
-      ..color = Colors.greenAccent
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5.0
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawLine(
-      Offset(center.dx - (radius * 0.45), center.dy),
-      Offset(center.dx + (radius * 0.45), center.dy),
-      dashPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
 }

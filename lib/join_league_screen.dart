@@ -1,5 +1,9 @@
 import 'dart:convert';
+import 'package:eplace/profile_completion_screen.dart';
+import 'package:eplace/profile_service.dart';
 import 'package:eplace/session_manager.dart';
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -11,7 +15,7 @@ class JoinLeagueScreen extends StatefulWidget {
 }
 
 class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
-  static const String _baseUrl = 'http://192.168.1.167:8080/api/v1/leagues';
+  static String get _baseUrl => '${ProfileService.baseUrl}/leagues';
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -19,6 +23,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
   List<Map<String, dynamic>> _allLeagues = [];
   List<Map<String, dynamic>> _filteredLeagues = [];
   String? _currentUsername;
+  int? _currentUserId;
 
   final TextEditingController _searchController = TextEditingController();
   double? _maxAmountFilter;
@@ -32,6 +37,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
 
   Future<void> _loadUserAndLeagues() async {
     _currentUsername = await SessionManager.getUsername();
+    _currentUserId = await SessionManager.getUserId();
     await _fetchLeagues();
   }
 
@@ -52,13 +58,13 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
       final response = await http.get(
         Uri.parse('$_baseUrl/active'),
         headers: {'Content-Type': 'application/json'},
-      );
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         setState(() {
           _allLeagues = List<Map<String, dynamic>>.from(data);
-          _applyFilters(); // Apply active search/filters
+          _applyFilters();
         });
       } else {
         setState(() {
@@ -85,18 +91,64 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
         final name = (league['name'] ?? '').toString().toLowerCase();
         final amount = (league['joinAmount'] ?? 0).toDouble();
 
-        // Check if name matches query OR amount contains query number
         final matchesQuery = query.isEmpty ||
             name.contains(query) ||
             amount.toString().contains(query);
 
-        // Check max amount filter chip
         final matchesAmountFilter =
             _maxAmountFilter == null || amount <= _maxAmountFilter!;
 
         return matchesQuery && matchesAmountFilter;
       }).toList();
     });
+  }
+
+  // --- CHECK USER PROFILE BEFORE JOINING ---
+  Future<void> _checkAndProceedJoin(Map<String, dynamic> league) async {
+    final int userId = _currentUserId ?? await SessionManager.getUserId() ?? 0;
+    if (userId == 0) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('User session not found. Please log in again.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse('http://172.16.123.181:8081/api/users/$userId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 5));
+
+      print("🔍 [DEBUG] User Profile Check Status Code: ${response.statusCode}");
+      print("🔍 [DEBUG] User Profile Check Response Body: ${response.body}");
+
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        final String? phone = userData['phoneNumber'];
+        final String? dob = userData['dateOfBirth'];
+
+
+
+        if (phone == null || phone.isEmpty || dob == null || dob.toString().isEmpty) {
+          if (!mounted) return;
+          final bool? completed = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (context) => ProfileCompletionSheet(userId: userId),
+          );
+
+          if (completed != true) return; // User canceled or didn't finish
+        }
+      }
+    } catch (e) {
+      debugPrint("Profile validation check error: $e");
+    }
+
+    if (!mounted) return;
+    _showJoinDialog(league);
   }
 
   void _showJoinDialog(Map<String, dynamic> league) {
@@ -106,7 +158,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).cardColor,
+      backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -125,21 +177,20 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
                           'Join ${league['name']}',
-                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.close),
+                          icon: const Icon(Icons.close, color: Colors.white),
                           onPressed: () => Navigator.pop(ctx),
                         ),
                       ],
                     ),
-                    const Divider(),
+                    const Divider(color: Colors.white24),
                     const SizedBox(height: 8),
 
                     Container(
@@ -167,12 +218,12 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                             ],
                           ),
                           const SizedBox(height: 8),
-                          Text('1. Go to M-Pesa -> Lipa na M-Pesa'),
-                          Text('2. Paybill: 247247'),
-                          Text('3. Account No: ePlace'),
+                          const Text('1. Go to M-Pesa -> Lipa na M-Pesa', style: TextStyle(color: Colors.white70)),
+                          const Text('2. Paybill: 247247', style: TextStyle(color: Colors.white70)),
+                          const Text('3. Account No: ePlace', style: TextStyle(color: Colors.white70)),
                           Text(
                             '4. Amount: KES ${league['joinAmount']}',
-                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.greenAccent),
                           ),
                           const SizedBox(height: 6),
                           const Text(
@@ -188,11 +239,16 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                     TextField(
                       controller: accountCodeController,
                       textCapitalization: TextCapitalization.characters,
+                      style: const TextStyle(color: Colors.white),
                       decoration: InputDecoration(
                         labelText: 'M-Pesa Transaction / Account Code',
+                        labelStyle: const TextStyle(color: Colors.grey),
                         hintText: 'e.g. QX78921KL',
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Colors.black38,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        prefixIcon: const Icon(Icons.receipt_long),
+                        prefixIcon: const Icon(Icons.receipt_long, color: Colors.blueAccent),
                       ),
                     ),
 
@@ -231,7 +287,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                           if (ctx.mounted) Navigator.pop(ctx);
 
                           if (mounted) {
-                            ScaffoldMessenger.of(this.context).showSnackBar(
+                            ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
                                   success
@@ -274,7 +330,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
           'accountCode': accountCode,
           'username': _currentUsername ?? 'Unknown',
         }),
-      );
+      ).timeout(const Duration(seconds: 8));
 
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
@@ -284,38 +340,43 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final cardColor = isDark ? const Color(0xFF121212) : Colors.white;
+    const cardColor = Color(0xFF1E1E1E);
 
-    return Scaffold(
+    return EPlaceScaffold(
       appBar: AppBar(
-        title: const Text('Find & Join Leagues'),
+        title: const Text('Find & Join Leagues', style: TextStyle(color: Colors.white)),
+        backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+        iconTheme: const IconThemeData(color: Colors.white),
+        elevation: 0,
       ),
       body: Column(
         children: [
-          // ================= SEARCH & FILTER BAR =================
           Padding(
             padding: const EdgeInsets.all(12.0),
             child: Column(
               children: [
                 TextField(
                   controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
                   decoration: InputDecoration(
                     hintText: 'Search by name or amount (e.g. 500)',
-                    prefixIcon: const Icon(Icons.search),
+                    hintStyle: const TextStyle(color: Colors.grey),
+                    prefixIcon: const Icon(Icons.search, color: Colors.blueAccent),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
-                      icon: const Icon(Icons.clear),
+                      icon: const Icon(Icons.clear, color: Colors.grey),
                       onPressed: () => _searchController.clear(),
                     )
                         : null,
+                    filled: true,
+                    fillColor: const Color(0xFF1E1E1E),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
                     ),
                   ),
                 ),
                 const SizedBox(height: 8),
-                // Filter chips for quick amount ranges
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
@@ -352,14 +413,13 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
               ],
             ),
           ),
-
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: EFootballLoader(size: 64))
                 : _errorMessage != null
-                ? Center(child: Text(_errorMessage!))
+                ? Center(child: Text(_errorMessage!, style: const TextStyle(color: Colors.white70)))
                 : _filteredLeagues.isEmpty
-                ? const Center(child: Text('No leagues found matching your search.'))
+                ? const Center(child: Text('No leagues found matching your search.', style: TextStyle(color: Colors.grey)))
                 : ListView.builder(
               itemCount: _filteredLeagues.length,
               padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -389,12 +449,13 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                                 style: const TextStyle(
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
+                                  color: Colors.white,
                                 ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 isCreator ? 'Host: You' : 'Host: ${league['creatorUsername']}',
-                                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                                style: TextStyle(color: Colors.grey[400], fontSize: 13),
                               ),
                               const SizedBox(height: 8),
                               Row(
@@ -420,13 +481,12 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
                           ),
                         ),
                         ElevatedButton(
-                          onPressed: (isFull || isCreator) ? null : () => _showJoinDialog(league),
+                          onPressed: (isFull || isCreator) ? null : () => _checkAndProceedJoin(league),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: isCreator ? Colors.orangeAccent.withValues(alpha: 0.2) : (isFull ? Colors.grey : Colors.blueAccent),
                           ),
                           child: Text(
-                            isCreator ? 'Owner' :
-                              isFull ? 'Full' : 'Join',
+                            isCreator ? 'Owner' : (isFull ? 'Full' : 'Join'),
                             style: TextStyle(
                               color: isCreator ? Colors.orangeAccent : Colors.white,
                             ),

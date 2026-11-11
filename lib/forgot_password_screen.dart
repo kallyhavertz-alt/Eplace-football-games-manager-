@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   final String baseUrl;
@@ -154,7 +156,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
                     const SizedBox(height: 24),
                     if (_isLoading)
-                      const Center(child: CircularProgressIndicator(color: Colors.blueAccent)),
+                      const Center(child: EFootballLoader(size: 64)),
                   ],
                 ),
               ),

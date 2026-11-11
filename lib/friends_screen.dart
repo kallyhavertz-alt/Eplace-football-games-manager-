@@ -1,5 +1,11 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:eplace/reusable_profile_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:eplace/profile_service.dart';
 import 'package:eplace/session_manager.dart';
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 import 'package:flutter/material.dart';
 
 class FriendsScreen extends StatefulWidget {
@@ -19,7 +25,6 @@ class _FriendsScreenState extends State<FriendsScreen>
   List<dynamic> _pendingList = [];
   List<dynamic> _receivedList = [];
 
-  // Search variables
   final TextEditingController _searchController = TextEditingController();
   List<dynamic> _searchResults = [];
   bool _isSearching = false;
@@ -38,6 +43,22 @@ class _FriendsScreenState extends State<FriendsScreen>
     super.dispose();
   }
 
+  Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 4));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  String _resolveAvatarUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+    final uri = Uri.parse(ProfileService.baseUrl);
+    return '${uri.scheme}://${uri.host}:${uri.port}${path.startsWith('/') ? '' : '/'}$path';
+  }
+
   Future<void> _loadFriendsData() async {
     final userId = await SessionManager.getUserId();
     if (userId == null) {
@@ -46,19 +67,48 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
 
     _userId = userId;
-    final overview = await ProfileService.fetchFriendshipOverview(userId);
+    final prefs = await SharedPreferences.getInstance();
+    final bool online = await _hasInternetConnection();
+
+    if (online) {
+      try {
+        final overview = await ProfileService.fetchFriendshipOverview(userId);
+        if (mounted && overview != null) {
+          setState(() {
+            _friendsList = overview['friends'] ?? [];
+            _pendingList = overview['pendingSent'] ?? [];
+            _receivedList = overview['receivedRequests'] ?? [];
+            _isLoading = false;
+          });
+          await prefs.setString('cached_friendship_overview_$userId', jsonEncode(overview));
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error loading friends overview online: $e');
+      }
+    }
+
+    final cachedStr = prefs.getString('cached_friendship_overview_$userId');
+    if (cachedStr != null) {
+      try {
+        final overview = jsonDecode(cachedStr);
+        if (mounted) {
+          setState(() {
+            _friendsList = overview['friends'] ?? [];
+            _pendingList = overview['pendingSent'] ?? [];
+            _receivedList = overview['receivedRequests'] ?? [];
+            _isLoading = false;
+          });
+          return;
+        }
+      } catch (_) {}
+    }
 
     if (mounted) {
-      setState(() {
-        _friendsList = overview?['friends'] ?? [];
-        _pendingList = overview?['pendingSent'] ?? [];
-        _receivedList = overview?['receivedRequests'] ?? [];
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  // Real search execution via ProfileService
   Future<void> _performSearch(String query) async {
     if (query.trim().isEmpty) {
       if (mounted) {
@@ -75,7 +125,6 @@ class _FriendsScreenState extends State<FriendsScreen>
 
     if (mounted) {
       setState(() {
-        // Filter out self from search results
         _searchResults = results.where((u) {
           final targetId = u['userId'] ?? u['id'];
           return targetId != _userId;
@@ -85,7 +134,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
   }
 
-  // 1. Send Request
   Future<void> _sendRequest(int targetUserId, String username) async {
     if (_userId == null) return;
 
@@ -102,7 +150,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
   }
 
-  // 2. Cancel Request
   Future<void> _cancelRequest(int targetUserId) async {
     if (_userId == null) return;
 
@@ -119,7 +166,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     }
   }
 
-  // 3. Respond to Incoming Request
   Future<void> _handleResponse(int friendshipId, bool accept, String username) async {
     if (_userId == null) return;
 
@@ -140,10 +186,9 @@ class _FriendsScreenState extends State<FriendsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+    return EPlaceScaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -211,7 +256,7 @@ class _FriendsScreenState extends State<FriendsScreen>
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+          ? const Center(child: EFootballLoader(size: 64))
           : RefreshIndicator(
         onRefresh: _loadFriendsData,
         color: Colors.blueAccent,
@@ -227,7 +272,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     );
   }
 
-  // 1. FRIENDS TAB
   Widget _buildFriendsTab() {
     if (_friendsList.isEmpty) {
       return _buildEmptyState('No friends added yet');
@@ -241,34 +285,58 @@ class _FriendsScreenState extends State<FriendsScreen>
         final friend = _friendsList[index];
         final bool isOnline = friend['isOnline'] ?? false;
         final String username = friend['username'] ?? 'User';
-        final String? avatarUrl = friend['avatarUrl'];
+        final String location = friend['location'] ?? 'Nairobi, Kenya';
+        final String resolvedAvatar = _resolveAvatarUrl(friend['profilePictureUrl'] ?? friend['avatarUrl']);
+        final int? targetUserId = friend['userId'] ?? friend['id'];
 
         return Card(
           color: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: ListTile(
-            leading: Stack(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: const Color(0xFF2A2A3C),
-                  backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                  child: avatarUrl == null ? const Icon(Icons.person, color: Colors.white) : null,
-                ),
-                Positioned(
-                  right: 0,
-                  bottom: 0,
-                  child: Container(
-                    width: 14,
-                    height: 14,
-                    decoration: BoxDecoration(
-                      color: isOnline ? Colors.greenAccent : Colors.grey,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: const Color(0xFF1E1E1E), width: 2),
+            onTap: () {
+              if (targetUserId != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                  ),
+                );
+              }
+            },
+            leading: GestureDetector(
+              onTap: () {
+                if (targetUserId != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                    ),
+                  );
+                }
+              },
+              child: Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF2A2A3C),
+                    backgroundImage: resolvedAvatar.isNotEmpty ? NetworkImage(resolvedAvatar) : null,
+                    child: resolvedAvatar.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: isOnline ? Colors.greenAccent : Colors.grey,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: const Color(0xFF1E1E1E), width: 2),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             title: Text(
               username,
@@ -278,33 +346,49 @@ class _FriendsScreenState extends State<FriendsScreen>
                 fontSize: 15,
               ),
             ),
-            subtitle: Row(
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 4,
-                  backgroundColor: isOnline ? Colors.greenAccent : Colors.grey,
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 12, color: Colors.blueAccent),
+                    const SizedBox(width: 4),
+                    Text(
+                      location,
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 6),
-                Text(
-                  isOnline ? 'Online' : 'Offline',
-                  style: TextStyle(
-                    color: isOnline ? Colors.greenAccent : Colors.grey,
-                    fontSize: 13,
-                  ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 4,
+                      backgroundColor: isOnline ? Colors.greenAccent : Colors.grey,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: isOnline ? Colors.greenAccent : Colors.grey,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
+            isThreeLine: true,
           ),
         );
       },
     );
   }
 
-  // 2. PENDING TAB WITH FUNCTIONAL SEARCH
   Widget _buildPendingTab() {
     return Column(
       children: [
-        // Search Header Input
         Padding(
           padding: const EdgeInsets.all(16.0),
           child: TextField(
@@ -344,7 +428,6 @@ class _FriendsScreenState extends State<FriendsScreen>
           ),
         ),
 
-        // SEARCH RESULTS DISPLAY
         if (_searchResults.isNotEmpty) ...[
           Expanded(
             child: ListView.separated(
@@ -353,13 +436,15 @@ class _FriendsScreenState extends State<FriendsScreen>
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 final user = _searchResults[index];
-                final int targetUserId = user['userId'] ?? user['id'];
+                final int? targetUserId = user['userId'] ?? user['id'];
                 final String username = user['username'] ?? '';
                 final String bio = user['bio'] ?? 'No bio provided';
                 final String location = user['location'] ?? 'Location hidden';
-                final String? avatarUrl = user['avatarUrl'];
+                final String resolvedAvatar = _resolveAvatarUrl(user['profilePictureUrl'] ?? user['avatarUrl']);
 
-                // Check if request is currently pending in list
+                final bool isAlreadyFriend = _friendsList.any(
+                      (f) => (f['userId'] ?? f['id']) == targetUserId,
+                );
                 final bool isPending = _pendingList.any(
                       (item) => item['userId'] == targetUserId || item['username'] == username,
                 );
@@ -370,75 +455,111 @@ class _FriendsScreenState extends State<FriendsScreen>
                     borderRadius: BorderRadius.circular(12),
                     side: const BorderSide(color: Color(0xFF2A2A3C)),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          radius: 26,
-                          backgroundColor: const Color(0xFF2A2A3C),
-                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                          child: avatarUrl == null
-                              ? const Icon(Icons.person, color: Colors.white, size: 28)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                username,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                bio,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(color: Colors.grey, fontSize: 13),
-                              ),
-                              const SizedBox(height: 2),
-                              Row(
-                                children: [
-                                  const Icon(Icons.location_on, size: 12, color: Colors.blueAccent),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    location,
-                                    style: const TextStyle(color: Colors.white70, fontSize: 11),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () {
+                      if (targetUserId != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                          ),
+                        );
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          CircleAvatar(
+                            radius: 26,
+                            backgroundColor: const Color(0xFF2A2A3C),
+                            backgroundImage: resolvedAvatar.isNotEmpty ? NetworkImage(resolvedAvatar) : null,
+                            child: resolvedAvatar.isEmpty
+                                ? const Icon(Icons.person, color: Colors.white, size: 28)
+                                : null,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  username,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
                                   ),
-                                ],
-                              ),
-                            ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  bio,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(color: Colors.grey, fontSize: 13),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.location_on, size: 12, color: Colors.blueAccent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      location,
+                                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 8),
+                          const SizedBox(width: 8),
 
-                        // Dynamic Action Button (+ Add vs Cancel)
-                        isPending
-                            ? OutlinedButton(
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Colors.redAccent),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          isAlreadyFriend
+                              ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.blueAccent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: Colors.blueAccent.withValues(alpha: 0.4)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.check, color: Colors.blueAccent, size: 14),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Friends",
+                                  style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                                ),
+                              ],
+                            ),
+                          )
+                              : isPending
+                              ? OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Colors.redAccent),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            ),
+                            onPressed: () {
+                              if (targetUserId != null) _cancelRequest(targetUserId);
+                            },
+                            child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                          )
+                              : ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueAccent,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                            ),
+                            onPressed: () {
+                              if (targetUserId != null) _sendRequest(targetUserId, username);
+                            },
+                            icon: const Icon(Icons.person_add, size: 16, color: Colors.white),
+                            label: const Text('+ Add', style: TextStyle(color: Colors.white, fontSize: 12)),
                           ),
-                          onPressed: () => _cancelRequest(targetUserId),
-                          child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
-                        )
-                            : ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          ),
-                          onPressed: () => _sendRequest(targetUserId, username),
-                          icon: const Icon(Icons.person_add, size: 16, color: Colors.white),
-                          label: const Text('+ Add', style: TextStyle(color: Colors.white, fontSize: 12)),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -446,7 +567,6 @@ class _FriendsScreenState extends State<FriendsScreen>
             ),
           ),
         ] else if (_pendingList.isNotEmpty) ...[
-          // SENT PENDING REQUESTS LIST
           Expanded(
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -454,18 +574,30 @@ class _FriendsScreenState extends State<FriendsScreen>
               separatorBuilder: (_, __) => const SizedBox(height: 12),
               itemBuilder: (context, index) {
                 final item = _pendingList[index];
-                final int targetUserId = item['userId'] ?? item['id'];
+                final int? targetUserId = item['userId'] ?? item['id'];
                 final String username = item['username'] ?? 'User';
                 final String timeAgo = item['timeAgo'] ?? 'Recently';
+                final String resolvedAvatar = _resolveAvatarUrl(item['profilePictureUrl'] ?? item['avatarUrl']);
 
                 return Card(
                   color: const Color(0xFF1E1E1E),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   child: ListTile(
-                    leading: const CircleAvatar(
+                    onTap: () {
+                      if (targetUserId != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                          ),
+                        );
+                      }
+                    },
+                    leading: CircleAvatar(
                       radius: 22,
-                      backgroundColor: Color(0xFF2A2A3C),
-                      child: Icon(Icons.person_outline, color: Colors.white70),
+                      backgroundColor: const Color(0xFF2A2A3C),
+                      backgroundImage: resolvedAvatar.isNotEmpty ? NetworkImage(resolvedAvatar) : null,
+                      child: resolvedAvatar.isEmpty ? const Icon(Icons.person_outline, color: Colors.white70) : null,
                     ),
                     title: Text(
                       username,
@@ -480,7 +612,9 @@ class _FriendsScreenState extends State<FriendsScreen>
                         side: const BorderSide(color: Colors.redAccent),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       ),
-                      onPressed: () => _cancelRequest(targetUserId),
+                      onPressed: () {
+                        if (targetUserId != null) _cancelRequest(targetUserId);
+                      },
                       child: const Text('Cancel', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                     ),
                   ),
@@ -506,7 +640,6 @@ class _FriendsScreenState extends State<FriendsScreen>
     );
   }
 
-  // 3. RECEIVED TAB
   Widget _buildReceivedTab() {
     if (_receivedList.isEmpty) {
       return _buildEmptyState('No incoming friend requests');
@@ -519,59 +652,75 @@ class _FriendsScreenState extends State<FriendsScreen>
       itemBuilder: (context, index) {
         final item = _receivedList[index];
         final int friendshipId = item['id'];
+        final int? targetUserId = item['userId'] ?? item['id'];
         final String username = item['username'] ?? 'User';
         final String timeAgo = item['timeAgo'] ?? 'Recently';
+        final String resolvedAvatar = _resolveAvatarUrl(item['profilePictureUrl'] ?? item['avatarUrl']);
 
         return Card(
           color: const Color(0xFF1E1E1E),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Color(0xFF2A2A3C),
-                  child: Icon(Icons.person, color: Colors.white),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        username,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () {
+              if (targetUserId != null) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                  ),
+                );
+              }
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF2A2A3C),
+                    backgroundImage: resolvedAvatar.isNotEmpty ? NetworkImage(resolvedAvatar) : null,
+                    child: resolvedAvatar.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          username,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        timeAgo,
-                        style: const TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20),
+                        const SizedBox(height: 2),
+                        Text(
+                          timeAgo,
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
-                  onPressed: () => _handleResponse(friendshipId, true, username),
-                  child: const Text('Accept', style: TextStyle(color: Colors.white, fontSize: 12)),
-                ),
-                const SizedBox(width: 6),
-                IconButton(
-                  icon: const Icon(Icons.close, color: Colors.grey),
-                  onPressed: () => _handleResponse(friendshipId, false, username),
-                ),
-              ],
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    onPressed: () => _handleResponse(friendshipId, true, username),
+                    child: const Text('Accept', style: TextStyle(color: Colors.white, fontSize: 12)),
+                  ),
+                  const SizedBox(width: 6),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                    onPressed: () => _handleResponse(friendshipId, false, username),
+                  ),
+                ],
+              ),
             ),
           ),
         );

@@ -19,7 +19,7 @@ class NotificationService {
   static final FlutterLocalNotificationsPlugin _localNotifications =
   FlutterLocalNotificationsPlugin();
 
-  static const String baseUrl = 'http://192.168.1.167:8080/api/v1/notifications';
+  static const String baseUrl = 'http://172.16.123.181:8081/api/v1/notifications';
 
   static Future<void> initialize() async {
     try {

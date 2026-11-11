@@ -1,8 +1,15 @@
+import 'dart:io';
+import 'dart:convert';
+import 'package:eplace/reusable_profile_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:eplace/analysis_screen.dart';
 import 'package:eplace/friends_screen.dart';
 import 'package:eplace/profile_service.dart';
 import 'package:eplace/session_manager.dart';
 import 'package:eplace/settings_screen.dart';
+import 'package:eplace/edit_profile_screen.dart';
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 import 'package:flutter/material.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -15,6 +22,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   int? _userId;
   bool _isLoading = true;
+  bool _isOffline = false;
 
   Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _friendshipData;
@@ -25,6 +33,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileData();
   }
 
+  Future<bool> _hasInternetConnection() async {
+    try {
+      final result = await InternetAddress.lookup('google.com').timeout(const Duration(seconds: 4));
+      return result.isNotEmpty && result[0].rawAddress.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _loadProfileData() async {
     final userId = await SessionManager.getUserId();
     if (userId == null) {
@@ -33,17 +50,91 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
 
     _userId = userId;
+    final prefs = await SharedPreferences.getInstance();
+    final bool online = await _hasInternetConnection();
 
-    final results = await Future.wait([
-      ProfileService.fetchUserProfile(userId),
-      ProfileService.fetchFriendshipOverview(userId),
-    ]);
+    if (online) {
+      try {
+        final results = await Future.wait([
+          ProfileService.fetchUserProfile(userId),
+          ProfileService.fetchFriendshipOverview(userId),
+        ]);
+
+        if (mounted) {
+          final profileData = results[0];
+          final friendshipData = results[1];
+
+          setState(() {
+            _userProfile = profileData;
+            _friendshipData = friendshipData;
+            _isLoading = false;
+            _isOffline = false;
+          });
+
+          // Cache details locally for offline use
+          if (profileData != null) {
+            final String? customAvatarPath = prefs.getString('user_avatar_path_$userId');
+            if (customAvatarPath != null) {
+              profileData['localAvatarPath'] = customAvatarPath;
+            }
+            await prefs.setString('cached_user_profile_$userId', jsonEncode(profileData));
+            await prefs.setString('cached_email_$userId', profileData['email'] ?? '');
+            await prefs.setString('cached_location_$userId', profileData['location'] ?? profileData['residentialCell'] ?? '');
+            await prefs.setString('cached_bio_$userId', profileData['bio'] ?? '');
+            if (profileData['profilePictureUrl'] != null) {
+              await prefs.setString('cached_avatar_$userId', profileData['profilePictureUrl']);
+            }
+          }
+          if (friendshipData != null) {
+            final friendsList = friendshipData['friends'] as List? ?? [];
+            await prefs.setInt('cached_friends_count_$userId', friendsList.length);
+            await prefs.setString('cached_friendship_overview_$userId', jsonEncode(friendshipData));
+          }
+          return;
+        }
+      } catch (e) {
+        debugPrint('Error fetching profile online, falling back to cache: $e');
+      }
+    }
+
+    // Fallback to local cache when offline or network error
+    final cachedProfileStr = prefs.getString('cached_user_profile_$userId');
+    final cachedOverviewStr = prefs.getString('cached_friendship_overview_$userId');
+    final customAvatarPath = prefs.getString('user_avatar_path_$userId');
+
+    Map<String, dynamic>? localProfile;
+    Map<String, dynamic>? localOverview;
+
+    if (cachedProfileStr != null) {
+      try {
+        localProfile = jsonDecode(cachedProfileStr);
+      } catch (_) {}
+    }
+    if (cachedOverviewStr != null) {
+      try {
+        localOverview = jsonDecode(cachedOverviewStr);
+      } catch (_) {}
+    }
+
+    localProfile ??= {};
+    if (customAvatarPath != null) {
+      localProfile['localAvatarPath'] = customAvatarPath;
+    }
 
     if (mounted) {
       setState(() {
-        _userProfile = results[0];
-        _friendshipData = results[1];
+        _userProfile = {
+          'username': localProfile?['username'] ?? prefs.getString('username') ?? 'User',
+          'email': localProfile?['email'] ?? prefs.getString('cached_email_$userId') ?? 'No email',
+          'bio': localProfile?['bio'] ?? prefs.getString('cached_bio_$userId') ?? 'PES Master',
+          'location': localProfile?['location'] ?? localProfile?['residentialCell'] ?? prefs.getString('cached_location_$userId') ?? 'Nairobi, Kenya',
+          'efootballStrength': localProfile?['efootballStrength'] ?? 3000,
+          'profilePictureUrl': localProfile?['profilePictureUrl'] ?? prefs.getString('cached_avatar_$userId') ?? '',
+          'localAvatarPath': localProfile?['localAvatarPath'],
+        };
+        _friendshipData = localOverview ?? {'friends': [], 'suggestions': []};
         _isLoading = false;
+        _isOffline = true;
       });
     }
   }
@@ -51,10 +142,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF121212),
+      return const EPlaceScaffold(
         body: Center(
-          child: CircularProgressIndicator(color: Colors.blueAccent),
+          child: EFootballLoader(size: 64),
         ),
       );
     }
@@ -62,8 +152,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final friends = (_friendshipData?['friends'] as List?) ?? [];
     final suggestions = (_friendshipData?['suggestions'] as List?) ?? [];
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+    return EPlaceScaffold(
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: _loadProfileData,
@@ -74,6 +163,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (_isOffline)
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.5)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.wifi_off, color: Colors.orangeAccent, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          'Offline Mode -',
+                          style: TextStyle(color: Colors.orangeAccent, fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+
                 // 1. TOP HEADER
                 _buildTopHeader(),
                 const SizedBox(height: 20),
@@ -140,6 +251,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Row(
           children: [
             IconButton(
+              icon: const Icon(Icons.edit_outlined, color: Colors.white),
+              tooltip: 'Edit Profile',
+              onPressed: () async {
+                if (_userId != null) {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => EditProfileScreen(
+                        userId: _userId!,
+                        baseUrl: ProfileService.baseUrl,
+                      ),
+                    ),
+                  );
+                  if (result == true) {
+                    _loadProfileData();
+                  }
+                }
+              },
+            ),
+            IconButton(
               icon: const Icon(Icons.people_alt_outlined, color: Colors.white),
               onPressed: () {
                 Navigator.push(
@@ -176,8 +307,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final username = _userProfile?['username'] ?? "User";
     final email = _userProfile?['email'] ?? "No email";
     final bio = _userProfile?['bio'] ?? "PES Master";
-    final location = _userProfile?['location'] ?? "Nairobi, Kenya";
+    final location = _userProfile?['location'] ?? _userProfile?['residentialCell'] ?? "Nairobi, Kenya";
     final strRating = _userProfile?['efootballStrength'] ?? 3000;
+    final String? serverAvatarPath = _userProfile?['profilePictureUrl'];
+    final String? localAvatarPath = _userProfile?['localAvatarPath'];
+
+    ImageProvider? avatarImage;
+    if (localAvatarPath != null && localAvatarPath.isNotEmpty && File(localAvatarPath).existsSync()) {
+      avatarImage = FileImage(File(localAvatarPath));
+    } else if (serverAvatarPath != null && serverAvatarPath.isNotEmpty) {
+      avatarImage = NetworkImage(ProfileService.getProfilePictureUrl(serverAvatarPath));
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -225,10 +365,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.blueAccent, width: 2),
               ),
-              child: const CircleAvatar(
+              child: CircleAvatar(
                 radius: 38,
-                backgroundColor: Color(0xFF2A2A3C),
-                child: Icon(Icons.person, size: 48, color: Colors.white70),
+                backgroundColor: const Color(0xFF2A2A3C),
+                backgroundImage: avatarImage,
+                child: avatarImage == null
+                    ? const Icon(Icons.person, size: 48, color: Colors.white70)
+                    : null,
               ),
             ),
             const SizedBox(height: 6),
@@ -340,7 +483,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
               ),
               Text(
-                "$subtitle • $prize",
+                "$subtitle\n$prize",
                 style: const TextStyle(color: Colors.grey, fontSize: 13),
               ),
             ],
@@ -383,26 +526,69 @@ class _ProfileScreenState extends State<ProfileScreen> {
         friends.isEmpty
             ? const Text("No friends added yet.", style: TextStyle(color: Colors.grey, fontSize: 13))
             : SizedBox(
-          height: 85,
+          height: 95,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: friends.length,
             separatorBuilder: (_, __) => const SizedBox(width: 16),
             itemBuilder: (context, index) {
               final friend = friends[index];
-              return Column(
-                children: [
-                  const CircleAvatar(
-                    radius: 26,
-                    backgroundColor: Color(0xFF2A2A3C),
-                    child: Icon(Icons.person, color: Colors.white),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    friend['username'] ?? 'User',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
+              final bool isOnline = friend['isOnline'] ?? friend['online'] ?? false;
+              final String location = friend['location'] ?? 'Nairobi, Kenya';
+              final String? friendAvatarPath = friend['profilePictureUrl'] ?? friend['avatarUrl'];
+              final String resolvedAvatarUrl = ProfileService.getProfilePictureUrl(friendAvatarPath);
+              final int friendId = friend['userId'] ?? friend['id'];
+
+              return GestureDetector(
+                onTap: () {
+                  if (friendId != null) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserProfileScreen(targetUserId: friendId),
+                      ),
+                    );
+                  }
+                },
+                child: Column(
+                  children: [
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: const Color(0xFF2A2A3C),
+                          backgroundImage: resolvedAvatarUrl.isNotEmpty ? NetworkImage(resolvedAvatarUrl) : null,
+                          child: resolvedAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white) : null,
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: isOnline ? Colors.greenAccent : Colors.grey,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFF121212), width: 2),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      friend['username'] ?? 'User',
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                    Text(
+                      location,
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           ),
@@ -446,55 +632,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
           itemBuilder: (context, index) {
             final suggestion = suggestions[index];
             final targetUserId = suggestion['userId'];
+            final String? suggestionAvatarPath = suggestion['profilePictureUrl'] ?? suggestion['avatarUrl'];
+            final String resolvedAvatarUrl = ProfileService.getProfilePictureUrl(suggestionAvatarPath);
 
             return Row(
               children: [
-                const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: Color(0xFF2A2A3C),
-                  child: Icon(Icons.person, color: Colors.white70),
+                GestureDetector(
+                  onTap: () {
+                    if (targetUserId != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                        ),
+                      );
+                    }
+                  },
+                  child: CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0xFF2A2A3C),
+                    backgroundImage: resolvedAvatarUrl.isNotEmpty ? NetworkImage(resolvedAvatarUrl) : null,
+                    child: resolvedAvatarUrl.isEmpty ? const Icon(Icons.person, color: Colors.white70) : null,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        suggestion['username'] ?? 'User',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      GestureDetector(
-                        onTap: () async {
-                          if (_userId != null && targetUserId != null) {
-                            final success = await ProfileService.sendFriendRequest(
-                                _userId!, targetUserId);
-                            if (mounted && success) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                      "Friend request sent to ${suggestion['username']}!"),
-                                ),
-                              );
-                              _loadProfileData();
-                            }
-                          }
-                        },
-                        child: const Text(
-                          "+ Add Friend",
-                          style: TextStyle(
-                            color: Colors.blueAccent,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
+                  child: GestureDetector(
+                    onTap: () {
+                      if (targetUserId != null) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => UserProfileScreen(targetUserId: targetUserId),
+                          ),
+                        );
+                      }
+                    },
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          suggestion['username'] ?? 'User',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 2),
+                        Text(
+                          suggestion['location'] ?? 'Nairobi, Kenya',
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.person_add_alt_1, color: Colors.blueAccent),
+                  tooltip: 'Add Friend',
+                  onPressed: () async {
+                    if (_userId != null && targetUserId != null) {
+                      final success = await ProfileService.sendFriendRequest(
+                          _userId!, targetUserId);
+                      if (mounted && success) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                "Friend request sent to ${suggestion['username']}!"),
+                          ),
+                        );
+                        _loadProfileData();
+                      }
+                    }
+                  },
                 ),
               ],
             );

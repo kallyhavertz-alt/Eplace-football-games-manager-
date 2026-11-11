@@ -1,460 +1,348 @@
-/*
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'package:eplace/notification_service.dart';
+import 'package:eplace/session_manager.dart';
+import 'package:eplace/Efootbal_loader.dart';
 
-class AdminPanelScreen extends StatefulWidget {
-  const AdminPanelScreen({super.key});
+class NotificationsScreen extends StatefulWidget {
+  const NotificationsScreen({super.key});
 
   @override
-  State<AdminPanelScreen> createState() => _AdminPanelScreenState();
+  State<NotificationsScreen> createState() => _NotificationsScreenState();
 }
 
-class _AdminPanelScreenState extends State<AdminPanelScreen> {
-  static const String _baseUrl = 'http://192.168.1.167:8080/api/v1/leagues';
+class _NotificationsScreenState extends State<NotificationsScreen> {
+  List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
-  String? _errorMessage;
-
-  List<Map<String, dynamic>> _pendingRequests = [];
-  List<Map<String, dynamic>> _pendingPayouts = [];
-  List<Map<String, dynamic>> _historyLogs = [];
+  int? _userId;
 
   @override
   void initState() {
     super.initState();
-    _fetchAdminDashboardData();
+    _loadLocalAndFetchNotifications();
   }
 
-  // --- FETCH DATA FROM SPRING BOOT ---
-  Future<void> _fetchAdminDashboardData() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
+  Future<void> _loadLocalAndFetchNotifications() async {
+    final userId = await SessionManager.getUserId();
+    _userId = userId;
+
+    // 1. Load locally saved notifications first
+    final prefs = await SharedPreferences.getInstance();
+    if (userId != null) {
+      final cachedString = prefs.getString('cached_notifications_$userId');
+      if (cachedString != null) {
+        try {
+          final List<dynamic> decoded = jsonDecode(cachedString);
+          setState(() {
+            _notifications = decoded.map((e) => Map<String, dynamic>.from(e)).toList();
+            _sortNotifications();
+            _isLoading = false;
+          });
+        } catch (e) {
+          debugPrint('Error decoding cached notifications: $e');
+        }
+      }
+    }
+
+    // 2. Fetch from API in background/fresh
+    if (userId != null) {
+      final list = await NotificationService.fetchUserNotifications(userId);
+      if (mounted && list.isNotEmpty) {
+        final List<Map<String, dynamic>> mapped = list.map((e) => Map<String, dynamic>.from(e)).toList();
+        setState(() {
+          _notifications = mapped;
+          _sortNotifications();
+          _isLoading = false;
+        });
+        await _saveNotificationsLocally(userId, mapped);
+      } else if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    } else {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveNotificationsLocally(int userId, List<Map<String, dynamic>> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('cached_notifications_$userId', jsonEncode(list));
+  }
+
+  void _sortNotifications() {
+    _notifications.sort((a, b) {
+      final timeA = DateTime.tryParse(a['created_at'] ?? a['createdAt'] ?? a['timestamp'] ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final timeB = DateTime.tryParse(b['created_at'] ?? b['createdAt'] ?? b['timestamp'] ?? '') ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return timeB.compareTo(timeA); // Newest first
     });
+  }
 
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/dashboard'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _pendingRequests = List<Map<String, dynamic>>.from(data['pendingRequests'] ?? []);
-          _pendingPayouts = List<Map<String, dynamic>>.from(data['pendingPayouts'] ?? []);
-          _historyLogs = List<Map<String, dynamic>>.from(data['historyLogs'] ?? []);
-        });
-      } else {
-        setState(() {
-          _errorMessage = 'Server error (${response.statusCode}): ${response.body}';
-        });
-      }
-    } catch (e) {
+  Future<void> _handleMarkAsRead(int? notificationId, bool isRead) async {
+    if (notificationId != null && !isRead) {
+      await NotificationService.markAsRead(notificationId);
       setState(() {
-        _errorMessage = 'Network error: $e';
+        for (var item in _notifications) {
+          if (item['id'] == notificationId) {
+            item['read'] = true;
+            item['isRead'] = true;
+          }
+        }
       });
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-
-  Future<void> _acceptRequest(String id, String message) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/requests/$id/accept'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        setState(() {
-          _pendingRequests.removeWhere((item) => item['id'] == id);
-          _historyLogs.insert(0, {
-            'type': 'ACCEPTED_JOIN',
-            'timeAgo': 'Just now',
-            'details': 'You Accepted $message',
-          });
-        });
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Accepted: $message'), backgroundColor: Colors.green),
-        );
-      } else {
-        throw Exception('Failed to accept request');
+      if (_userId != null) {
+        await _saveNotificationsLocally(_userId!, _notifications);
       }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.redAccent),
-      );
     }
   }
 
-  Future<void> _rejectRequest(String id, String message) async {
-    try {
-      final String numericId = id.replaceAll('req_', '');
+  void _showFullMessageDrawer(Map<String, dynamic> item) {
+    final int? notificationId = item['id'];
+    final bool isRead = item['read'] ?? item['isRead'] ?? false;
+    final String title = item['title'] ?? 'Notification';
+    final String message = item['message'] ?? item['body'] ?? '';
+    final String timeStr = _formatTimestamp(item['created_at'] ?? item['createdAt'] ?? item['timestamp']);
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/admin/$numericId/reject'),
-        headers: {'Content-Type': 'application/json'},
-      );
+    // Mark as read when viewing full message
+    _handleMarkAsRead(notificationId, isRead);
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        setState(() {
-          _pendingRequests.removeWhere((item) => item['id'] == id);
-          _historyLogs.insert(0, {
-            'type': 'REJECTED_JOIN',
-            'timeAgo': 'Just now',
-            'details': 'You Rejected $message',
-          });
-        });
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rejected: $message'), backgroundColor: Colors.redAccent),
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.95),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[600],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Icon(
+                    title.contains('Approved') || title.contains('Verified')
+                        ? Icons.check_circle_outline
+                        : Icons.notifications_active_outlined,
+                    color: title.contains('Approved') || title.contains('Verified')
+                        ? Colors.greenAccent
+                        : Colors.blueAccent,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                timeStr,
+                style: TextStyle(color: Colors.grey[400], fontSize: 12),
+              ),
+              const Divider(color: Colors.grey, height: 24),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: SingleChildScrollView(
+                  child: Text(
+                    message,
+                    style: const TextStyle(color: Colors.white70, fontSize: 15, height: 1.4),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close', style: TextStyle(color: Colors.white)),
+                ),
+              ),
+            ],
+          ),
         );
-      } else {
-        throw Exception('Failed to reject request (${response.statusCode})');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.redAccent),
-      );
+      },
+    );
+  }
+
+  String _formatTimestamp(dynamic rawTimestamp) {
+    if (rawTimestamp == null) return '';
+    final dt = DateTime.tryParse(rawTimestamp.toString());
+    if (dt == null) return rawTimestamp.toString();
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      return 'Today at ${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
+    } else {
+      return '${dt.year}-${_twoDigits(dt.month)}-${_twoDigits(dt.day)} ${_twoDigits(dt.hour)}:${_twoDigits(dt.minute)}';
     }
   }
 
-  Future<void> _confirmPayout(String id, String leagueTitle) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/payouts/$id/confirm'),
-        headers: {'Content-Type': 'application/json'},
-      );
-
-      if (response.statusCode == 200) {
-        final targetPayout = _pendingPayouts.firstWhere((p) => p['id'] == id, orElse: () => {});
-
-        setState(() {
-          _pendingPayouts.removeWhere((item) => item['id'] == id);
-          _historyLogs.insert(0, {
-            'type': 'CONFIRMED_WINNER',
-            'timeAgo': 'Just now',
-            'details': 'You confirmed payout for $leagueTitle (${targetPayout['winner'] ?? 'Multiple Winners'})',
-          });
-        });
-
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Payout Confirmed for $leagueTitle!'), backgroundColor: Colors.blueAccent),
-        );
-      } else {
-        throw Exception('Failed to confirm payout');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.redAccent),
-      );
-    }
-  }
+  String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
   @override
   Widget build(BuildContext context) {
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-
-    final Color backgroundColor = isDark ? Colors.black : Colors.grey[50]!;
-    final Color cardColor = isDark ? const Color(0xFF080808) : Colors.white;
-    final Color textColor = isDark ? Colors.white : Colors.black;
-    final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[700]!;
-    final Color dividerColor = isDark ? Colors.grey[900]! : Colors.grey[200]!;
-
-    return Scaffold(
-      backgroundColor: backgroundColor,
-      appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF080808) : Colors.white,
-        elevation: 1,
-        shadowColor: isDark ? Colors.transparent : Colors.black12,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: textColor),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Admin Panel',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18),
-            ),
-            Text(
-              'ePlace',
-              style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 1.1),
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh, color: textColor),
-            onPressed: _fetchAdminDashboardData,
-          )
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
-          : _errorMessage != null
-          ? Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-              const SizedBox(height: 12),
-              Text(_errorMessage!, style: TextStyle(color: subTextColor), textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _fetchAdminDashboardData,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-                child: const Text('Retry Connection'),
-              )
-            ],
+    return Stack(
+      children: [
+        // Full screen background image
+        Positioned.fill(
+          child: Image.asset(
+            'assets/screens.png',
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
           ),
         ),
-      )
-          : RefreshIndicator(
-        onRefresh: _fetchAdminDashboardData,
-        color: Colors.blueAccent,
-        child: ListView(
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // ==================== PENDING CREATIONS & JOINS ====================
-            if (_pendingRequests.isNotEmpty) ...[
-              Text(
-                'Pending Approvals',
-                style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-            ],
-            ..._pendingRequests.map((req) {
-              final bool isJoin = req['type'] == 'JOIN';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: dividerColor),
+        // Transparent Scaffold stacked on top
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            title: const Text('Notifications', style: TextStyle(color: Colors.white)),
+            backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.0),
+            iconTheme: const IconThemeData(color: Colors.white),
+            elevation: 0,
+          ),
+          body: _isLoading
+              ? const Center(child: EFootballLoader(size: 64))
+              : _notifications.isEmpty
+              ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 12),
+                Text(
+                  'No notifications yet',
+                  style: TextStyle(color: Colors.grey[300], fontSize: 16),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Colors.blueAccent.withValues(alpha: 0.15),
-                      child: Text(
-                        req['userInitials'] ?? 'U',
-                        style: const TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          RichText(
-                            text: TextSpan(
-                              style: TextStyle(color: textColor, fontSize: 14, height: 1.3),
-                              children: [
-                                TextSpan(text: req['username'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                TextSpan(text: isJoin ? ' wanted to join ' : ' wanted to create '),
-                                TextSpan(text: req['target'], style: const TextStyle(fontWeight: FontWeight.bold)),
-                                TextSpan(
-                                  text: ' @ ${req['amount']} kes',
-                                  style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => _acceptRequest(req['id'], '${req['username']} -> ${req['target']}'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green[600],
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      ),
-                      child: const Text('Accept', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-              );
-            }),
+              ],
+            ),
+          )
+              : RefreshIndicator(
+            onRefresh: _loadLocalAndFetchNotifications,
+            color: Colors.blueAccent,
+            child: ListView.builder(
+              itemCount: _notifications.length,
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+              itemBuilder: (context, index) {
+                final item = _notifications[index];
+                final bool isRead = item['read'] ?? item['isRead'] ?? false;
+                final String title = item['title'] ?? 'Notification';
+                final String message = item['message'] ?? item['body'] ?? '';
+                final String timeStr = _formatTimestamp(item['created_at'] ?? item['createdAt'] ?? item['timestamp']);
 
-            // ==================== LEAGUE ENDED / PAYOUTS SECTION ====================
-            if (_pendingPayouts.isNotEmpty) ...[
-              const SizedBox(height: 12),
-              Text(
-                'Pending Winner Payouts',
-                style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-            ],
-            ..._pendingPayouts.map((payout) {
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: dividerColor),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                final bool isLong = message.length > 60;
+                final String displayMessage = (isLong && !isRead)
+                    ? '${message.substring(0, 60)}...'
+                    : message;
+
+                return Card(
+                  color: isRead ? const Color(0xFF1E1E1E).withValues(alpha: 0.85) : const Color(0xFF2A2A3C).withValues(alpha: 0.9),
+                  margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                    side: BorderSide(
+                      color: isRead ? Colors.transparent : Colors.blueAccent.withValues(alpha: 0.6),
+                      width: 1,
+                    ),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            const Icon(Icons.emoji_events_outlined, color: Colors.amber, size: 20),
-                            const SizedBox(width: 6),
-                            Text(
-                              payout['title'],
-                              style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 14),
+                            CircleAvatar(
+                              radius: 16,
+                              backgroundColor: title.contains('Approved') || title.contains('Verified')
+                                  ? Colors.green.withValues(alpha: 0.3)
+                                  : Colors.red.withValues(alpha: 0.3),
+                              child: Icon(
+                                title.contains('Approved') || title.contains('Verified')
+                                    ? Icons.check_circle_outline
+                                    : Icons.error_outline,
+                                size: 18,
+                                color: title.contains('Approved') || title.contains('Verified')
+                                    ? Colors.greenAccent
+                                    : Colors.redAccent,
+                              ),
                             ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            if (timeStr.isNotEmpty)
+                              Text(
+                                timeStr,
+                                style: TextStyle(color: Colors.grey[400], fontSize: 11),
+                              ),
                           ],
                         ),
+                        const SizedBox(height: 8),
                         Text(
-                          payout['timeAgo'] ?? '',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                        )
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      (payout['isMultiWinner'] ?? false) ? 'ended. Winners are:' : 'ended.',
-                      style: TextStyle(color: subTextColor, fontSize: 13),
-                    ),
-                    const SizedBox(height: 8),
-
-                    if (!(payout['isMultiWinner'] ?? false)) ...[
-                      RichText(
-                        text: TextSpan(
-                          style: TextStyle(color: textColor, fontSize: 14, height: 1.4),
+                          displayMessage,
+                          style: TextStyle(color: Colors.grey[200], fontSize: 13),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            const TextSpan(text: 'winner takes '),
-                            TextSpan(
-                              text: 'kes ${payout['amount']}. ',
-                              style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold),
-                            ),
-                            const TextSpan(text: 'Phone number: '),
-                            TextSpan(
-                              text: '${payout['phone']} ',
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            TextSpan(
-                              text: payout['winner'],
-                              style: TextStyle(color: Colors.blueAccent[100], fontWeight: FontWeight.bold),
-                            ),
+                            if (!isRead || isLong)
+                              TextButton(
+                                style: TextButton.styleFrom(
+                                  padding: EdgeInsets.zero,
+                                  minimumSize: const Size(50, 30),
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => _showFullMessageDrawer(item),
+                                child: const Text(
+                                  'read',
+                                  style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 13),
+                                ),
+                              ),
                           ],
                         ),
-                      ),
-                    ] else ...[
-                      ...((payout['winners'] ?? []) as List<dynamic>).map((w) {
-                        final winnerMap = Map<String, dynamic>.from(w);
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2.0),
-                          child: Row(
-                            children: [
-                              Text('${winnerMap['rank']} ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-                              Text('${winnerMap['name']}: ', style: TextStyle(color: textColor, fontWeight: FontWeight.w600)),
-                              Text('${winnerMap['phone']} - ', style: TextStyle(color: subTextColor)),
-                              Text('${winnerMap['prize']}', style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: OutlinedButton(
-                        onPressed: () => _confirmPayout(payout['id'], payout['title']),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Colors.blueAccent, width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                        ),
-                        child: const Text(
-                          'Confirm',
-                          style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                    )
-                  ],
-                ),
-              );
-            }),
-
-            const SizedBox(height: 10),
-            const Divider(color: Colors.white24),
-            const SizedBox(height: 10),
-
-            // ==================== ACCEPTED AND CONFIRMED HISTORY SECTION ====================
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12.0),
-              child: Text(
-                'Accepted and Confirmed',
-                style: TextStyle(color: textColor, fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-            ),
-
-            ..._historyLogs.map((log) {
-              final bool isWinner = log['type'] == 'CONFIRMED_WINNER';
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.grey[900]!.withValues(alpha: 0.4) : Colors.grey[200]!.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Icon(
-                          isWinner ? Icons.emoji_events_outlined : Icons.check_circle_outline,
-                          color: isWinner ? Colors.amber : Colors.greenAccent,
-                          size: 18,
-                        ),
-                        Text(
-                          log['timeAgo'] ?? '',
-                          style: TextStyle(color: Colors.grey[500], fontSize: 11),
-                        )
                       ],
                     ),
-                    const SizedBox(height: 8),
-                    Text(
-                      log['details'] ?? '',
-                      style: TextStyle(color: subTextColor, fontSize: 13, height: 1.3),
-                    ),
-                  ],
-                ),
-              );
-            }),
-          ],
+                  ),
+                );
+              },
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 }
-*/

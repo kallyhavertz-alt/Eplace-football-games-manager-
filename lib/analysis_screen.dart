@@ -1,5 +1,7 @@
 import 'package:eplace/profile_service.dart';
 import 'package:eplace/session_manager.dart';
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 import 'package:flutter/material.dart';
 
 class AnalysisScreen extends StatefulWidget {
@@ -48,15 +50,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(
-        backgroundColor: const Color(0xFF121212),
-        appBar: AppBar(
-          backgroundColor: const Color(0xFF1E1E1E),
-          elevation: 0,
-          title: const Text('Analysis', style: TextStyle(color: Colors.white)),
-        ),
-        body: const Center(
-          child: CircularProgressIndicator(color: Colors.blueAccent),
+      return const EPlaceScaffold(
+        body: Center(
+          child: EFootballLoader(size: 64),
         ),
       );
     }
@@ -74,10 +70,9 @@ class _AnalysisScreenState extends State<AnalysisScreen> {
     final List rawRecent = _analyticsData?['recentPerformances'] ?? [0, 0, 0, 0, 0];
     final List<int> recentPerformances = rawRecent.map((e) => (e as num).toInt()).toList();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF121212),
+    return EPlaceScaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E1E1E),
+        backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),

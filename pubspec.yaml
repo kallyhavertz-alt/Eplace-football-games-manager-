@@ -18,12 +18,17 @@ dependencies:
   cupertino_icons: ^1.0.8
   shared_preferences: ^2.5.5
   firebase_messaging: ^16.4.3
+  image_picker: ^1.2.4
+
   flutter_local_notifications: ^22.1.0
 
 flutter_launcher_icons:
-    android: "launcher_icon"
-    ios: true
-    image_path: "assets/eplace_logo.png"
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/eplace_logo.png"
+  adaptive_icon_background: "#121212"
+  adaptive_icon_foreground: "assets/eplace_logo.png"
+  remove_alpha_ios: true
 
 dev_dependencies:
   flutter_test:
@@ -35,3 +40,6 @@ flutter:
   assets:
     - assets/eplace_background.png
     - assets/eplace.png
+    - assets/eplace_logo.png
+    - assets/screens.png
+    - assets/league.png

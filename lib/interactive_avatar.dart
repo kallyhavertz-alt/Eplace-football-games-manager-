@@ -1,5 +1,4 @@
 import 'package:eplace/profile_screen.dart';
-import 'package:eplace/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'admin_panel_screen.dart';
 
@@ -23,7 +22,6 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
     return widget.username.trim()[0].toUpperCase();
   }
 
-  // --- PASSWORD CHALLENGE DIALOG ---
   void _showAdminPasswordDialog() {
     final TextEditingController passwordController = TextEditingController();
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
@@ -145,10 +143,6 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
               builder: (context) => const ProfileScreen(),
             ),
           );
-        } else if (value == 'logout') {
-          await SessionManager.clearSession();
-          if (!mounted) return;
-          Navigator.of(context).pushNamedAndRemoveUntil('/', (route) => false);
         }
       },
       offset: const Offset(0, 48), // Drops the menu down cleanly right below the avatar
@@ -160,7 +154,7 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
         ),
       ),
       child: CircleAvatar(
-        radius: 16,
+        radius: 13,
         backgroundColor: Colors.blueAccent,
         child: Text(
           _avatarLetter,
@@ -197,21 +191,6 @@ class _InteractiveAvatarState extends State<InteractiveAvatar> {
               ),
               const SizedBox(width: 10),
               Text('Admin Panel', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
-            ],
-          ),
-        ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: 'logout',
-          child: Row(
-            children: [
-              const Icon(
-                Icons.logout,
-                color: Colors.redAccent,
-                size: 18,
-              ),
-              const SizedBox(width: 10),
-              Text('Logout', style: TextStyle(color: isDark ? Colors.white : Colors.black)),
             ],
           ),
         ),

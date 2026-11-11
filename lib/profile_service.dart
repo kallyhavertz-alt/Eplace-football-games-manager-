@@ -3,11 +3,20 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ProfileService {
-  static const String baseUrl = 'http://192.168.1.167:8080/api/v1';
+  static const String baseUrl = 'http://172.16.123.181:8081/api/v1';
 
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
   };
+
+  static String getProfilePictureUrl(String? path) {
+    if (path == null || path.isEmpty) return '';
+    if (path.startsWith('http')) return path;
+
+    final uri = Uri.parse(baseUrl);
+    final baseHost = '${uri.scheme}://${uri.host}:${uri.port}';
+    return '$baseHost${path.startsWith('/') ? '' : '/'}$path';
+  }
 
   // 1. Fetch User Profile
   static Future<Map<String, dynamic>?> fetchUserProfile(int userId) async {
@@ -142,3 +151,4 @@ class ProfileService {
     return null;
   }
 }
+

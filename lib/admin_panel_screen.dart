@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:eplace/eplace_scaffold.dart';
+import 'package:eplace/Efootbal_loader.dart';
 
 class AdminPanelScreen extends StatefulWidget {
   const AdminPanelScreen({super.key});
@@ -10,7 +12,7 @@ class AdminPanelScreen extends StatefulWidget {
 }
 
 class _AdminPanelScreenState extends State<AdminPanelScreen> {
-  static const String _baseUrl = 'http://192.168.1.167:8080/api/v1/leagues';
+  static const String _baseUrl = 'http://172.16.123.181:8081/api/v1/leagues';
   bool _isLoading = true;
   String? _errorMessage;
 
@@ -172,12 +174,11 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
     final Color subTextColor = isDark ? Colors.grey[400]! : Colors.grey[700]!;
     final Color dividerColor = isDark ? Colors.grey[900]! : Colors.grey[200]!;
 
-    return Scaffold(
-      backgroundColor: backgroundColor,
+    return EPlaceScaffold(
       appBar: AppBar(
-        backgroundColor: isDark ? const Color(0xFF080808) : Colors.white,
+        backgroundColor: const Color(0xFF1E1E1E).withValues(alpha: 0.4),
         elevation: 1,
-        shadowColor: isDark ? Colors.transparent : Colors.black12,
+        iconTheme: const IconThemeData(color: Colors.white),
         leading: IconButton(
           icon: Icon(Icons.arrow_back, color: textColor),
           onPressed: () => Navigator.pop(context),
@@ -203,7 +204,7 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
+          ? const Center(child: EFootballLoader(size: 64))
           : _errorMessage != null
           ? Center(
         child: Padding(
