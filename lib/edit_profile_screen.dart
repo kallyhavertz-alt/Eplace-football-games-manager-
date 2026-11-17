@@ -13,7 +13,7 @@ class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({
     super.key,
     required this.userId,
-    this.baseUrl = 'http://172.16.123.181:8081/api/v1',
+    this.baseUrl = 'http://172.16.125.226:8081/api/v1',
   });
 
   @override

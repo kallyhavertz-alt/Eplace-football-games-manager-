@@ -14,14 +14,6 @@
       },
       "oauth_client": [
         {
-          "client_id": "910119612022-fbmequbvhurkk39gnmf48p2si07jc0k0.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.ePlace.eplace",
-            "certificate_hash": "899d8efbb67b625a0db212e06a6353188627845d"
-          }
-        },
-        {
           "client_id": "910119612022-kpmtlbvtnd1msto82beg0j7lmqcnqd1h.apps.googleusercontent.com",
           "client_type": 3
         }

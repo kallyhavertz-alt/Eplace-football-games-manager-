@@ -1,4 +1,5 @@
 import 'package:eplace/create_league_screen.dart';
+import 'package:eplace/inbox_screen.dart';
 import 'package:eplace/interactive_avatar.dart';
 import 'package:eplace/join_league_screen.dart';
 import 'package:eplace/notification_service.dart';
@@ -205,13 +206,28 @@ class _EplaceDashboardScreenState extends State<EplaceDashboardScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
-        onTap: (index) {
+        onTap: (index) async {
           setState(() => _currentIndex = index);
           if (index == 2) {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const CreateLeagueScreen()),
             );
+          } else if (index == 3) {
+            final int? currentUserId = await SessionManager.getUserId();
+            if (!mounted) return;
+            if (currentUserId != null) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => InboxScreen(currentUserId: currentUserId),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Unable to retrieve user session.')),
+              );
+            }
           }
         },
         type: BottomNavigationBarType.fixed,

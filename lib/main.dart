@@ -5,6 +5,7 @@ import 'package:eplace/session_manager.dart';
 import 'package:eplace/settings_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'dart:convert';
 import 'package:eplace/notification_service.dart';
 import 'package:http/http.dart' as http;
@@ -35,7 +36,7 @@ Future<void> _handleStartupSubscription() async {
   try {
     final int? savedUserId = await SessionManager.getUserId();
     if (savedUserId != null) {
-      debugPrint("🚀 Startup session found: userId $savedUserId. Subscribing...");
+      debugPrint("Startup session found: userId $savedUserId. Subscribing...");
       NotificationService.subscribeToUserTopic(savedUserId);
     }
   } catch (e) {
@@ -92,7 +93,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool isLogin = true;
   bool _isLoading = false;
 
-  final String _baseUrl = 'http://172.16.123.181:8081/api';
+  final String _baseUrl = 'http://172.16.125.226:8081/api';
   static const String _webClientId = '910119612022-kpmtlbvtnd1msto82beg0j7lmqcnqd1h.apps.googleusercontent.com';
 
   final _googleSignIn = GoogleSignIn.instance;
@@ -136,18 +137,31 @@ class _AuthScreenState extends State<AuthScreen> {
   Future<void> _handleGoogleSignIn() async {
     setState(() => _isLoading = true);
     try {
+      await _initializeGooglePlugin();
 
-      await _googleSignIn.signOut();
+      try {
+        await _googleSignIn.signOut();
+      } catch (_) {}
 
-      final googleUser = await _googleSignIn.authenticate();
+      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
 
-      final googleAuth = googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
       final String? idToken = googleAuth.idToken;
 
-      if (idToken == null) {
+      if (idToken == null || idToken.isEmpty) {
         _showSnackbar('Failed to acquire secure Google Identity Token.');
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
         return;
+      }
+
+      try {
+        final credential = GoogleAuthProvider.credential(
+          idToken: idToken,
+        );
+        await FirebaseAuth.instance.signInWithCredential(credential);
+        debugPrint("Firebase Auth sign-in successful.");
+      } catch (e) {
+        debugPrint("Firebase Auth sign-in note: $e");
       }
 
       debugPrint("Secure token retrieved successfully. Passing to Spring Boot pipeline...");
@@ -172,17 +186,16 @@ class _AuthScreenState extends State<AuthScreen> {
 
         if (userId == null || jwtToken == null) {
           _showSnackbar('Invalid credentials returned from server.');
-          setState(() => _isLoading = false);
+          if (mounted) setState(() => _isLoading = false);
           return;
         }
 
-         await Future.wait([
+        await Future.wait([
           SessionManager.saveUserId(userId),
           SessionManager.saveUsername(username),
           if (email != null) SessionManager.saveEmail(email),
           if (jwtToken.isNotEmpty) SessionManager.saveAuthToken(jwtToken),
         ]);
-
 
         debugPrint("Calling subscribeToUserTopic for userId: $userId");
         await NotificationService.subscribeToUserTopic(userId);
@@ -194,7 +207,7 @@ class _AuthScreenState extends State<AuthScreen> {
       } else {
         debugPrint("Backend authentication failed with status: ${response.statusCode}");
         _showSnackbar('Google registration/login rejected by eplace servers.');
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
       debugPrint("Critical Error encountered during Google Sign-In pipeline: $e");

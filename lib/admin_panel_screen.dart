@@ -12,7 +12,7 @@ class AdminPanelScreen extends StatefulWidget {
 }
 
 class _AdminPanelScreenState extends State<AdminPanelScreen> {
-  static const String _baseUrl = 'http://172.16.123.181:8081/api/v1/leagues';
+  static const String _baseUrl = 'http://172.16.125.226:8081/api/v1/leagues';
   bool _isLoading = true;
   String? _errorMessage;
 

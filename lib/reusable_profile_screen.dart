@@ -1,5 +1,5 @@
-import 'dart:io';
-import 'dart:convert';
+import 'package:eplace/chat_api_service.dart';
+import 'package:eplace/chat_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:eplace/profile_service.dart';
 import 'package:eplace/session_manager.dart';
@@ -207,7 +207,78 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ],
               ),
               const SizedBox(height: 12),
-              if (_currentUserId != widget.targetUserId)
+              if (_currentUserId != widget.targetUserId) ...[
+                // 1. Friendship Status / Action Button
+                _isAlreadyFriend
+                    ? Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.blueAccent.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.blueAccent.withOpacity(0.4)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.check, color: Colors.blueAccent, size: 16),
+                      SizedBox(width: 6),
+                      Text(
+                        "Friends",
+                        style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                )
+                    : const SizedBox.shrink(), // Or your Add Friend button widget
+
+                const SizedBox(height: 10),
+
+                // 2. Direct Message Button (Launches Chat with this user)
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                  label: const Text(
+                    "Message",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  ),
+                  onPressed: () async {
+                    if (_currentUserId == null) return;
+                    final targetUsername = _userProfile?['username'] ?? "User";
+                    final isTargetOnline = _userProfile?['isOnline'] ?? _userProfile?['online'] ?? false;
+                    //final conversationId = _friendshipData?['conversationId']?.toString();
+                    final existingConvId = await ChatApiService().findExistingConversationId(
+                      _currentUserId!,
+                      widget.targetUserId,
+                    );
+
+                    if (!mounted) return;
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          currentUserId: _currentUserId!,
+                          opponentUserId: widget.targetUserId,
+                          recipientId: widget.targetUserId,
+                          conversationId: existingConvId,
+                          opponentUsername: targetUsername,
+                          isOpponentOnline: isTargetOnline,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ]
+
+              else if (_currentUserId != widget.targetUserId)
                 _isAlreadyFriend
                     ? Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -239,6 +310,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                   icon: const Icon(Icons.person_add, size: 16),
                   label: const Text("Add Friend", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
                 ),
+
             ],
           ),
         ),

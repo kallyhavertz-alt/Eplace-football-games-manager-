@@ -19,7 +19,7 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _maxTeamsController = TextEditingController();
 
-  static const String _backendApiUrl = 'http://172.16.123.181:8081/api/v1/leagues/create-request';
+  static const String _backendApiUrl = 'http://172.16.125.226:8081/api/v1/leagues/create-request';
 
   final List<int> _allowedAmounts = [20, 30, 40, 50, 60, 70, 80, 90, 100, 150, 200, 300, 500, 600, 1000];
   int _selectedAmount = 50;
@@ -78,7 +78,7 @@ class _CreateLeagueScreenState extends State<CreateLeagueScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://172.16.123.181:8081/api/users/$userId'),
+        Uri.parse('http://172.16.125.226:8081/api/users/$userId'),
         headers: {'Content-Type': 'application/json'},
       );
 

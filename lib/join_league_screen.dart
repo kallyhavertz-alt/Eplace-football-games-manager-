@@ -117,7 +117,7 @@ class _JoinLeagueScreenState extends State<JoinLeagueScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://172.16.123.181:8081/api/users/$userId'),
+        Uri.parse('http://172.16.125.226:8081/api/users/$userId'),
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 5));
 

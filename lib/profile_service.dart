@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ProfileService {
-  static const String baseUrl = 'http://172.16.123.181:8081/api/v1';
+  static const String baseUrl = 'http://172.16.125.226:8081/api/v1';
 
   static const Map<String, String> _headers = {
     'Content-Type': 'application/json',
